@@ -1,0 +1,11 @@
+import { createApp } from 'vue';
+import { createI18n } from 'vue-i18n';
+import TDesign from 'tdesign-vue-next';
+import { Icon } from 'tdesign-icons-vue-next';
+import 'tdesign-vue-next/dist/tdesign.css';
+import '../upstream/frontend/src/assets/theme/theme.css';
+import 'katex/dist/katex.min.css';
+import './reader-shell.css';
+import zh from '../upstream/frontend/src/i18n/locales/zh-CN';
+import WikiBrowser from './WikiBrowser.vue';
+createApp(WikiBrowser).use(TDesign).component('t-icon', Icon).use(createI18n({ legacy: false, locale: 'zh-CN', messages: { 'zh-CN': zh } })).mount('#app');

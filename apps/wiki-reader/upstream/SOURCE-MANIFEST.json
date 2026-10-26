@@ -1,0 +1,70 @@
+{
+  "repository": "Tencent/WeKnora",
+  "commit": "e1f9a6166a593a4804a2f99f1d942919c9cc8ea7",
+  "files": [
+    {
+      "file": "LICENSE",
+      "sha256": "5935f49975d7daf97857d7053b6fe45500a3b2ec31cc92a42a89a5fd98a86cea"
+    },
+    {
+      "file": "frontend/package.json",
+      "sha256": "22a673ec3715689f3f1cc308625d618db2defcc1d6a12a7b0eb65b1179f72e13"
+    },
+    {
+      "file": "frontend/src/views/knowledge/wiki/WikiBrowser.vue",
+      "sha256": "4bb13d08f2f1cd4c9256cb94fc3d1a1bc9669b308f32f393db02cddb0abffd30"
+    },
+    {
+      "file": "frontend/src/views/knowledge/wiki/WikiRevisionDrawer.vue",
+      "sha256": "6d172c9d2160ef87de40e2eab4df64a6d9e63042845630529e2aff34c97cd4bc"
+    },
+    {
+      "file": "frontend/src/api/wiki/index.ts",
+      "sha256": "e8cb63ee23686cd97123dd8f8f08bb53cc56cfad965e7e6f9a3eea997c0ad5d5"
+    },
+    {
+      "file": "frontend/src/assets/theme/theme.css",
+      "sha256": "0d84afeace3d1414a8348cc8527ccd1089dae796a3e60b4591a02a35bf3ac657"
+    },
+    {
+      "file": "frontend/src/components/settings/SettingDrawer.vue",
+      "sha256": "e4b1296e35bd435684b77c9f471303bf859646d0e472d230c1a02c0a7964cd31"
+    },
+    {
+      "file": "frontend/src/i18n/locales/zh-CN.ts",
+      "sha256": "237381cac24a54d2b778d23e83a48f006887f36930bb26eb66047df13b0d6daf"
+    },
+    {
+      "file": "frontend/src/utils/markedLiteralTilde.ts",
+      "sha256": "be0c13349ce94849a9e1774c640cbcc26e91697492d06cf96397c1b927027cb4"
+    },
+    {
+      "file": "frontend/src/utils/security.ts",
+      "sha256": "5bc6457673f7de32b8f543d2b82063f5d3e4450e60579bb002a92964b0c36fd0"
+    },
+    {
+      "file": "frontend/src/utils/wikiRevisionDiff.ts",
+      "sha256": "35f459f59dd8f9c37dfbe24ccb858af18235e38bb2be88795934dbdc929d07c5"
+    },
+    {
+      "file": "frontend/src/utils/wikiLineDiff.ts",
+      "sha256": "89bcc880c6129f13b3b6e8677429e2569bcca8848656385c38642cb2386d625e"
+    },
+    {
+      "file": "frontend/src/utils/markdownDomPurify.ts",
+      "sha256": "4be96560a67cc3d819035ae8a49094f2c31659c39fceb304b035cd78f82bd917"
+    },
+    {
+      "file": "frontend/src/main.ts",
+      "sha256": "bd132d2494e1a3075c7bfbd26d64a3fd720c8a448507b428238bdebedba660fe"
+    },
+    {
+      "file": "frontend/src/App.vue",
+      "sha256": "fb45732e72708687583c106e9b3ccdfc39c77fc066d94a76bc532dc9bd283a82"
+    },
+    {
+      "file": "frontend/src/components/css/markdown.less",
+      "sha256": "d49d59148c89df1e9ccdd12788606de58159ce36283f6467fdfec66143999bfb"
+    }
+  ]
+}

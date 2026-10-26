@@ -1,0 +1,11 @@
+<template><section><details><summary>证据与复核（{{page.evidence.length}} 个映射，{{page.review?.status??'not-reviewed'}}）</summary><p>{{page.review?.scope??'未记录语义复核范围'}}</p><article v-for="e in page.evidence" :key="e.id" class="evidence-record"><strong>{{e.target.field==='summary'?'摘要':'正文'}}片段</strong><blockquote>{{e.target.quote}}</blockquote><div v-for="(c,i) in e.citations" :key="i"><button @click="$emit('open-source',c.sourceId,c.revision,c.startByte,c.endByte)">{{sourceName(c.sourceId)}} · v{{c.revision}} · 第 {{line(c)}} 行{{c.page?' · 物理页 '+c.page:''}}</button><p>{{context(c)?.documentType??'类型未知'}} · {{context(c)?.date??'日期未知'}} · {{context(c)?.attribution??'归属未记录'}}</p><blockquote>{{c.quote}}</blockquote><details><summary>精确定位与关联</summary><p>{{c.sourceId}} · 来源 UTF-8 bytes {{c.startByte}}–{{c.endByte}} · 本页 {{e.target.startByte}}–{{e.target.endByte}}{{c.jsonPointer?' · JSON '+c.jsonPointer:''}}</p></details></div></article></details><details><summary>本页结构化问题（{{issues.length}}）</summary><article v-for="i in issues" :key="i.issueId"><strong>{{i.type}} · {{i.status}}</strong><p>{{i.description}}</p><p v-if="i.resolution">{{i.resolution}}</p></article><p v-if="!issues.length">没有关联问题</p></details></section></template>
+<script setup lang="ts">
+import {computed} from 'vue';import {snapshot} from './adapter';
+const props=defineProps<{page:any}>();defineEmits(['open-source']);
+const state=snapshot().state;
+const source=(id:string)=>state.sources.find((s:any)=>s.sourceId===id);
+const sourceName=(id:string)=>source(id)?.path.split(/[\\/]/).at(-1)??'来源不可用';
+const context=(c:any)=>{const context=state.sourceContexts?.find((s:any)=>s.sourceId===c.sourceId&&s.revision===c.revision);const artifact=source(c.sourceId)?.artifact;return context?{...context,attribution:context.attribution+(artifact?' · 产物身份：'+artifact.kind+' · '+artifact.authority:'')}:artifact?{documentType:artifact.kind,date:'产物记录',attribution:artifact.authority}:undefined;};
+const line=(c:any)=>{const v=source(c.sourceId)?.versions.find((v:any)=>v.revision===c.revision);return v?new TextDecoder().decode(new TextEncoder().encode(v.text).slice(0,c.startByte)).split('\n').length:'未知';};
+const issues=computed(()=>state.issues?.filter((i:any)=>i.pageIds.includes(props.page.pageId))??[]);
+</script>

@@ -1,0 +1,140 @@
+diff --git a/upstream/frontend/src/views/knowledge/wiki/WikiRevisionDrawer.vue b/src/WikiRevisionDrawer.vue
+index 84e6d95d..fad61f6e 100644
+--- a/upstream/frontend/src/views/knowledge/wiki/WikiRevisionDrawer.vue
++++ b/src/WikiRevisionDrawer.vue
+@@ -2,13 +2,13 @@
+   <SettingDrawer v-model:visible="drawerVisible" class="wiki-revision-drawer" :title="drawerTitle" icon="history"
+     width="760px" :min-width="560" :max-width="1280" storage-key="setting-drawer:width:wiki-revision-history"
+     hide-footer>
+-    <div class="wiki-rev-layout">
++    <p v-if="loadError" class="reader-error" role="alert">{{loadError}}</p><div class="wiki-rev-layout">
+       <!-- Version list -->
+       <aside class="wiki-rev-list">
+         <div class="wiki-rev-list-items">
+           <div v-if="currentPage" class="wiki-rev-item"
+             :class="{ 'wiki-rev-item--active': selectedVersion === currentPage.version }"
+-            @click="selectCurrent">
++            role="button" tabindex="0" @keydown.enter="selectCurrent" @click="selectCurrent">
+             <div class="wiki-rev-item-primary">
+               <span class="wiki-rev-version">v{{ currentPage.version }}</span>
+               <span class="wiki-rev-current-label">{{ t('knowledgeEditor.wikiBrowser.revisionCurrent') }}</span>
+@@ -20,7 +20,7 @@
+           </div>
+ 
+           <div v-for="rev in revisions" :key="rev.id" class="wiki-rev-item"
+-            :class="{ 'wiki-rev-item--active': selectedVersion === rev.version }" @click="selectRevision(rev)">
++            :class="{ 'wiki-rev-item--active': selectedVersion === rev.version }" role="button" tabindex="0" @keydown.enter="selectRevision(rev)" @click="selectRevision(rev)">
+             <div class="wiki-rev-item-primary">
+               <span class="wiki-rev-version">v{{ rev.version }}</span>
+             </div>
+@@ -58,14 +58,6 @@
+                   {{ option.label }}
+                 </button>
+               </div>
+-              <t-popconfirm v-if="canEdit && selectedRevision"
+-                :content="t('knowledgeEditor.wikiBrowser.revertConfirm', { ver: selectedRevision.version })"
+-                @confirm="doRevert">
+-                <t-button size="small" variant="text" theme="warning" :loading="reverting">
+-                  <template #icon><t-icon name="rollback" /></template>
+-                  {{ t('knowledgeEditor.wikiBrowser.revertBtn') }}
+-                </t-button>
+-              </t-popconfirm>
+             </div>
+           </div>
+ 
+@@ -111,10 +103,9 @@ import SettingDrawer from '@/components/settings/SettingDrawer.vue'
+ import {
+   listWikiRevisions,
+   getWikiRevision,
+-  revertWikiPage,
+   type WikiPage,
+   type WikiPageRevision,
+-} from '@/api/wiki'
++} from './adapter'
+ import { diffWikiRevision, type WikiRevisionDiffField, type WikiRevisionSnapshot } from '@/utils/wikiRevisionDiff'
+ 
+ type ViewMode = 'incremental' | 'cumulative' | 'raw'
+@@ -136,15 +127,14 @@ const props = defineProps<{
+   kbId: string
+   slug: string
+   currentPage: WikiPage | null
+-  canEdit?: boolean
+ }>()
+ 
+ const emit = defineEmits<{
+   (e: 'update:visible', visible: boolean): void
+-  (e: 'reverted', page: WikiPage): void
+ }>()
+ 
+ const { t } = useI18n()
++const loadError = ref('')
+ 
+ const drawerVisible = computed({
+   get: () => props.visible,
+@@ -166,7 +156,6 @@ const selectedRevision = ref<WikiPageRevision | null>(null)
+ const detailContent = ref('')
+ const loadingDetail = ref(false)
+ const viewMode = ref<ViewMode>('incremental')
+-const reverting = ref(false)
+ const diffLoading = ref(false)
+ const diffPair = ref<DiffPair | null>(null)
+ // True when the selected version's own snapshot is gone (e.g. pruned between
+@@ -403,13 +392,14 @@ async function loadDiffPair() {
+   } catch (e: any) {
+     if (seq !== diffRequestSeq) return
+     diffPair.value = null
+-    MessagePlugin.error(e?.message || t('knowledgeEditor.wikiBrowser.revisionLoadFailed'))
++    loadError.value = String(e?.message || t('knowledgeEditor.wikiBrowser.revisionLoadFailed'))
+   } finally {
+     if (seq === diffRequestSeq) diffLoading.value = false
+   }
+ }
+ 
+ function resetAndLoad() {
++  loadError.value = ''
+   detailRequestSeq++
+   diffRequestSeq++
+   snapshotCache.clear()
+@@ -444,7 +434,7 @@ async function loadList(offset: number) {
+     }
+     total.value = data.total ?? revisions.value.length
+   } catch (e: any) {
+-    MessagePlugin.error(e?.message || t('knowledgeEditor.wikiBrowser.revisionLoadFailed'))
++    loadError.value = String(e?.message || t('knowledgeEditor.wikiBrowser.revisionLoadFailed'))
+   } finally {
+     loadingList.value = false
+   }
+@@ -487,7 +477,7 @@ async function selectRevision(rev: WikiPageRevision) {
+     if (seq !== detailRequestSeq) return
+     // 404 = snapshot not retained (pre-revision history or pruned); the raw
+     // server message is English and gives the user nothing actionable.
+-    MessagePlugin.error(e?.status === 404
++    loadError.value = String(e?.status === 404
+       ? t('knowledgeEditor.wikiBrowser.revisionNotRetained')
+       : (e?.message || t('knowledgeEditor.wikiBrowser.revisionLoadFailed')))
+   } finally {
+@@ -495,23 +485,7 @@ async function selectRevision(rev: WikiPageRevision) {
+   }
+ }
+ 
+-async function doRevert() {
+-  if (!selectedRevision.value) return
+-  reverting.value = true
+-  try {
+-    const res = await revertWikiPage(props.kbId, props.slug, selectedRevision.value.version)
+-    const updated = ((res as any).data || (res as any)) as WikiPage
+-    MessagePlugin.success(t('knowledgeEditor.wikiBrowser.revertSuccess', { ver: selectedRevision.value.version }))
+-    emit('reverted', updated)
+-    // Stay open: reload so the just-created snapshot of the pre-revert
+-    // version shows up and the "current" entry reflects the new version.
+-    resetAndLoad()
+-  } catch (e: any) {
+-    MessagePlugin.error(e?.message || t('knowledgeEditor.wikiBrowser.revertFailed'))
+-  } finally {
+-    reverting.value = false
+-  }
+-}
++
+ 
+ function diffPrefix(type: 'same' | 'add' | 'del'): string {
+   return type === 'add' ? '+ ' : type === 'del' ? '- ' : '  '

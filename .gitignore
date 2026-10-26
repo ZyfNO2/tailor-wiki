@@ -1,0 +1,10 @@
+node_modules/
+dist/
+artifacts/
+.wiki/
+.agents/
+.dsh/
+.env
+.env.*
+*.log
+Thumbs.db

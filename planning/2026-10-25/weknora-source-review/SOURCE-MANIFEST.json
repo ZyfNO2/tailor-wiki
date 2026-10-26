@@ -1,0 +1,72 @@
+{
+  "repository": "Tencent/WeKnora",
+  "commit": "e1f9a6166a593a4804a2f99f1d942919c9cc8ea7",
+  "reviewDate": "2026-10-25",
+  "files": [
+    {
+      "path": "LICENSE",
+      "sha256": "560fbcc506d0c48829fca9cd920ff4f6aaf43ba11659f9be612c3374eabc9b8e",
+      "url": "https://github.com/Tencent/WeKnora/blob/e1f9a6166a593a4804a2f99f1d942919c9cc8ea7/LICENSE"
+    },
+    {
+      "path": "frontend/src/api/wiki/index.ts",
+      "sha256": "d059e218ac98eb99745043393c6676f27f498a87faac0b6d0a9d03a3de335178",
+      "url": "https://github.com/Tencent/WeKnora/blob/e1f9a6166a593a4804a2f99f1d942919c9cc8ea7/frontend/src/api/wiki/index.ts"
+    },
+    {
+      "path": "frontend/src/views/knowledge/wiki/WikiBrowser.vue",
+      "sha256": "71a6448e435747bdba41147a1900bc5facc6aa878ca814497ec76ed04e7df9d2",
+      "url": "https://github.com/Tencent/WeKnora/blob/e1f9a6166a593a4804a2f99f1d942919c9cc8ea7/frontend/src/views/knowledge/wiki/WikiBrowser.vue"
+    },
+    {
+      "path": "frontend/src/views/knowledge/wiki/WikiRevisionDrawer.vue",
+      "sha256": "171b4987f4e4786488b87bc1c9e65ff8a47ceaf959ac1887dd4efcf042244540",
+      "url": "https://github.com/Tencent/WeKnora/blob/e1f9a6166a593a4804a2f99f1d942919c9cc8ea7/frontend/src/views/knowledge/wiki/WikiRevisionDrawer.vue"
+    },
+    {
+      "path": "internal/agent/prompts_wiki.go",
+      "sha256": "78edf856dd9a23406932f00b821756d4811bb7b805b3245510762aad0f963996",
+      "url": "https://github.com/Tencent/WeKnora/blob/e1f9a6166a593a4804a2f99f1d942919c9cc8ea7/internal/agent/prompts_wiki.go"
+    },
+    {
+      "path": "internal/application/service/wiki_ingest_batch.go",
+      "sha256": "71b22afa90d4dce9c9b0cf7cabc42972436c7406d5f0919db67d18d331ad5aa2",
+      "url": "https://github.com/Tencent/WeKnora/blob/e1f9a6166a593a4804a2f99f1d942919c9cc8ea7/internal/application/service/wiki_ingest_batch.go"
+    },
+    {
+      "path": "internal/application/service/wiki_ingest_cite.go",
+      "sha256": "37c611193a094a5dac2db573983a17514a56f695a29f6963dad0e84ce52a0a9a",
+      "url": "https://github.com/Tencent/WeKnora/blob/e1f9a6166a593a4804a2f99f1d942919c9cc8ea7/internal/application/service/wiki_ingest_cite.go"
+    },
+    {
+      "path": "internal/application/service/wiki_ingest_dedup.go",
+      "sha256": "2a838bae1a643a0fc599ed596a9a70a806b0f7d77808a06afa90f4827a07729d",
+      "url": "https://github.com/Tencent/WeKnora/blob/e1f9a6166a593a4804a2f99f1d942919c9cc8ea7/internal/application/service/wiki_ingest_dedup.go"
+    },
+    {
+      "path": "internal/application/service/wiki_ingest.go",
+      "sha256": "aa025ebe89fe8acf37c965f4666554538073b568fef3cdc4ed9182b7655a037a",
+      "url": "https://github.com/Tencent/WeKnora/blob/e1f9a6166a593a4804a2f99f1d942919c9cc8ea7/internal/application/service/wiki_ingest.go"
+    },
+    {
+      "path": "internal/application/service/wiki_lint.go",
+      "sha256": "b75c7d82ddafd784d4a3173819a4270e25ffeb84be66c27f981b4d1c09b51540",
+      "url": "https://github.com/Tencent/WeKnora/blob/e1f9a6166a593a4804a2f99f1d942919c9cc8ea7/internal/application/service/wiki_lint.go"
+    },
+    {
+      "path": "internal/application/service/wiki_page.go",
+      "sha256": "6ebe4f7621cb6b68fcde96e4936210b7418a8caaafce3110f33be61a90a45482",
+      "url": "https://github.com/Tencent/WeKnora/blob/e1f9a6166a593a4804a2f99f1d942919c9cc8ea7/internal/application/service/wiki_page.go"
+    },
+    {
+      "path": "internal/types/wiki_page.go",
+      "sha256": "f7c8a3be5de2fd47304b3060bfac17c9562b5637481d66ff88c1a2743bb4b0cd",
+      "url": "https://github.com/Tencent/WeKnora/blob/e1f9a6166a593a4804a2f99f1d942919c9cc8ea7/internal/types/wiki_page.go"
+    },
+    {
+      "path": "website-docs/03-features/14-wiki.md",
+      "sha256": "17ee5320ac8a000040b51109311f828c49a455aec87395ca57923cec663db7c1",
+      "url": "https://github.com/Tencent/WeKnora/blob/e1f9a6166a593a4804a2f99f1d942919c9cc8ea7/website-docs/03-features/14-wiki.md"
+    }
+  ]
+}

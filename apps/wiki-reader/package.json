@@ -1,0 +1,26 @@
+{
+  "name": "weknora-readonly-reader",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "start": "node server.mjs",
+    "test": "node --test tests/*.spec.mjs"
+  },
+  "dependencies": {
+    "vue": "3.5.34",
+    "vue-i18n": "11.4.2",
+    "tdesign-vue-next": "1.19.2",
+    "tdesign-icons-vue-next": "0.4.4",
+    "marked": "17.0.5",
+    "dompurify": "3.4.11",
+    "katex": "0.16.45",
+    "marked-katex-extension": "5.1.8"
+  },
+  "devDependencies": {
+    "vite": "7.3.5",
+    "@vitejs/plugin-vue": "6.0.6",
+    "less": "4.6.4",
+    "typescript": "6.0.3"
+  }
+}

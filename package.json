@@ -1,0 +1,19 @@
+{
+  "name": "tailor-wiki",
+  "private": true,
+  "version": "0.7.0",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test tests/file-wiki/*.spec.mjs",
+    "build:skills": "node scripts/build-independent-skills.mjs",
+    "test:reader": "npm --prefix apps/wiki-reader test",
+    "build:reader": "npm --prefix apps/wiki-reader run build"
+  },
+  "dependencies": {
+    "fflate": "0.8.3"
+  }
+}
