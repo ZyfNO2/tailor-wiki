@@ -20,6 +20,14 @@ node install-independent.mjs --workspace "F:\my-research" --write
 
 安装到 `.agents/skills/`，不覆盖已有同名目录，不写凭据。可直接使用完整 Skill 名；短意图不意味着宿主已注册 slash 命令，内置 `/init` 保留。
 
+Claude Code 读取项目 `.claude/skills/`，加 `--host claude`：
+
+```powershell
+node install-independent.mjs --workspace "F:\my-research" --host claude --write
+```
+
+详见 [Claude Code 入口说明](research-pack/ENTRYPOINTS.md#claude-code)。
+
 ## 源码验证与 reader
 
 ```powershell

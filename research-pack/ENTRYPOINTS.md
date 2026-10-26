@@ -30,6 +30,18 @@ node research-intent.mjs --workspace "F:\my-project" --input intent.json
 
 存在 Wiki 时，通过同目录独立运行助手校验真实 manifest、读取当前提交及恢复 journal。未发布/损坏快照不降级为空。读取路径匹配的来源时保留原 sourceId/revision 与当前字节一致性；实验/叙事默认 Wiki 回流使用运行助手的增量交接，不能据本脚本的发现列表宣称已同步。同步失败只重试维护，不重跑实验。
 
+## Claude Code
+
+Claude Code 从项目 `.claude/skills/<name>/SKILL.md` 发现 Skill。安装时加 `--host claude`，只写这一目录，不改 `.claude/settings*.json`、MCP 或全局配置：
+
+```powershell
+node install-independent.mjs --workspace "F:\my-project" --host claude --write
+```
+
+按 Claude Code 约定，四个 Skill 以原名调用（`/wiki-maintain`、`/academic-tailor`、`/experiment-design`、`/research-story`），或直接描述任务由 Claude 按 description 选用。Claude Code 内置 `/init` 用于生成 CLAUDE.md，本分发不占用；整理/恢复 Wiki 用 `wiki-maintain` 或本地 `--intent research-init`。
+
+`research-intent.mjs` 同时识别 `.agents/skills` 与 `.claude/skills`。Wiki 扫描和产物读取跳过 `.claude/`，不把 Skill 说明或本地设置当作研究材料。仓库测试验证安装布局、frontmatter 约束与安装后的运行助手，未在活 Claude Code 会话验证菜单显示。
+
 ## DSH 发现的实际限制
 
 已安装 DSH 的 filesystem provider 确认支持项目 `.agents/skills`，而同一项目 `.dsh/skills` 具有更高优先级。它会向上寻找最近 `.git` 作为项目根；在某个 Git 仓库子目录安装后，从子目录启动并不保证扫描该子目录下的 `.agents/skills`。应安装到实际项目根，或由宿主显式配置 customSkillDirs；不要据独立安装器成功推断活宿主发现。

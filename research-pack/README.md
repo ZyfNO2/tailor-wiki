@@ -114,6 +114,8 @@ node install-independent.mjs --workspace "F:\my-research" --write
 
 安装位置为工作区下的 `.agents/skills/`。安装器不改全局配置、不写模型凭据，遇到同名目录会拒绝覆盖；更新已有安装前保留本地修改，按宿主支持的更新方式处理。目录发现与斜杠命令支持以实际宿主为准。
 
+Claude Code 用户加 `--host claude`，安装到项目 `.claude/skills/`，见 [入口说明](ENTRYPOINTS.md#claude-code)。
+
 也可将需要的 Skill 目录导入宿主，或要求 Agent 读取对应 `SKILL.md`，保留配套 references 与 scripts。Wiki 内部运行方式见 [RUNTIME.md](trial-skills/wiki-maintain/RUNTIME.md)，日常使用无需逐条调用内部命令。
 
 旧 `install.mjs` 与根 `SKILL.md` 属于历史单总 Skill 路径，不是本版安装入口。旧 README 已归档为 [历史说明](../planning/2026-10-26/RESEARCH-PACK-README-LEGACY.md)。
@@ -131,6 +133,7 @@ node install-independent.mjs --workspace "F:\my-research" --write
 | 短意图入口、读取适配 | 本地 research-intent 可用，真实 DSH filesystem provider 发现四 Skill 已验；原生 slash 未注册 |
 | 只读 Wiki reader | 原 WK Vue/TDesign reader/version 裁剪接线，验证记录随工程交付；不是完整工作台 |
 | 知识图谱与 DAG 白板 | 仍为设计/接线阶段 |
+| Claude Code 安装 | `--host claude` 安装到项目 `.claude/skills/`；扫描排除 `.claude/`；未在活会话验证菜单 |
 | Team | 占位，后续可选扩展 |
 | DSH 插件同步 | 后于技能包更新，独立验收与发布 |
 

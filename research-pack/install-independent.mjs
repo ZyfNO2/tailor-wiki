@@ -5,6 +5,9 @@ import { createHash, randomUUID } from 'node:crypto';
 
 export const skillNames = ['wiki-maintain', 'academic-tailor', 'experiment-design', 'research-story'];
 export const packRoot = path.dirname(fileURLToPath(import.meta.url));
+// Project skill roots per host: DSH-style providers read .agents/skills,
+// Claude Code reads .claude/skills. Choosing one never touches the other.
+export const skillHosts = Object.freeze({ agents: '.agents', claude: '.claude' });
 export function skillFiles(name, root = packRoot) {
   if (!skillNames.includes(name)) throw new Error(`UNKNOWN_SKILL: ${name}`);
   const base = path.join(root, 'trial-skills', name), files = [];
@@ -31,18 +34,20 @@ export function skillFiles(name, root = packRoot) {
   }
   return files.sort().map(file => ({ name, file, sha256: createHash('sha256').update(fs.readFileSync(path.join(base, file))).digest('hex') }));
 }
-export function installIndependent(workspacePath, selected = skillNames, write = false, root = packRoot) {
-  const workspace = fs.realpathSync(workspacePath), names = [...new Set(selected)];
+export function installIndependent(workspacePath, selected = skillNames, write = false, root = packRoot, host = 'agents') {
+  const workspace = fs.realpathSync(workspacePath), names = [...new Set(selected)], base = skillHosts[host];
+  if (!Object.hasOwn(skillHosts, host)) throw new Error(`INVALID_INPUT: host must be ${Object.keys(skillHosts).join(' or ')}`);
   if (!names.length) throw new Error('INVALID_INPUT: select at least one skill');
   const files = names.flatMap(name => skillFiles(name, root));
-  for (const name of ['.agents', '.agents/skills', ...names.map(n => `.agents/skills/${n}`)]) {
+  for (const name of [base, `${base}/skills`, ...names.map(n => `${base}/skills/${n}`)]) {
     const file = path.join(workspace, name);
     if (fs.existsSync(file) && (fs.lstatSync(file).isSymbolicLink() || !fs.lstatSync(file).isDirectory())) throw new Error(`PATH_ESCAPE: ${name}`);
   }
-  const destinations = names.map(name => ({ name, path: path.join(workspace, '.agents/skills', name) }));
+  const destinations = names.map(name => ({ name, path: path.join(workspace, base, 'skills', name) }));
   for (const destination of destinations) if (fs.existsSync(destination.path)) throw new Error(`ALREADY_EXISTS: ${destination.name}; existing files are never overwritten`);
+  const discovery = host === 'claude' ? 'Claude Code project skills directory; if a running session does not list them, start a new session.' : 'native skill discovery depends on the host.';
   if (write) {
-    const stage = path.join(workspace, '.agents', `independent-install-${randomUUID()}`);
+    const stage = path.join(workspace, base, `independent-install-${randomUUID()}`);
     fs.mkdirSync(stage, { recursive: true });
     // Validate and stage every resource first. Retain staging on interruption/failure;
     // installation is not claimed atomic across multiple destination directories.
@@ -55,7 +60,7 @@ export function installIndependent(workspacePath, selected = skillNames, write =
         fs.copyFileSync(path.join(root, 'trial-skills', entry.name, entry.file), target, fs.constants.COPYFILE_EXCL);
         if (createHash('sha256').update(fs.readFileSync(target)).digest('hex') !== entry.sha256) throw new Error(`SOURCE_CHANGED: ${entry.name}/${entry.file}`);
       }
-      fs.mkdirSync(path.join(workspace, '.agents/skills'), { recursive: true });
+      fs.mkdirSync(path.join(workspace, base, 'skills'), { recursive: true });
       for (const destination of destinations) {
         if (fs.existsSync(destination.path)) throw new Error(`ALREADY_EXISTS: ${destination.name} appeared during staging`);
         // mkdir is exclusive: a racing installer/user directory cannot be replaced.
@@ -69,14 +74,14 @@ export function installIndependent(workspacePath, selected = skillNames, write =
       }
       receipt.status = 'installed'; saveReceipt();
     } catch (error) { receipt.status = 'failed'; receipt.error = String(error); saveReceipt(); throw new Error(`INSTALL_FAILED: ${error.message}; inspect ${stage}/install-receipt.json`, { cause: error }); }
-    return { mode: 'installed', destinations, files, receipt: path.join(stage, 'install-receipt.json'), note: 'No MCP/global configuration changed; native skill discovery depends on the host.' };
+    return { mode: 'installed', host, destinations, files, receipt: path.join(stage, 'install-receipt.json'), note: `No MCP/global configuration changed; ${discovery}` };
   }
-  return { mode: 'preview', destinations, files, note: 'Use --write to install. No MCP/global configuration changed.' };
+  return { mode: 'preview', host, destinations, files, note: 'Use --write to install. No MCP/global configuration changed.' };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {
-    const args = process.argv.slice(2), index = args.indexOf('--workspace'), selected = args.indexOf('--skill');
-    if (index < 0 || !args[index + 1]) throw new Error('--workspace DIR required; preview by default; optional --skill NAME; --write installs');
-    process.stdout.write(JSON.stringify(installIndependent(args[index + 1], selected < 0 ? skillNames : [args[selected + 1]], args.includes('--write')), null, 2) + '\n');
+    const args = process.argv.slice(2), index = args.indexOf('--workspace'), selected = args.indexOf('--skill'), host = args.indexOf('--host');
+    if (index < 0 || !args[index + 1]) throw new Error('--workspace DIR required; preview by default; optional --skill NAME; --host agents|claude (default agents); --write installs');
+    process.stdout.write(JSON.stringify(installIndependent(args[index + 1], selected < 0 ? skillNames : [args[selected + 1]], args.includes('--write'), packRoot, host < 0 ? 'agents' : args[host + 1]), null, 2) + '\n');
   } catch (error) { process.stderr.write(`${error.stack ?? error}\n`); process.exitCode = 1; }
 }

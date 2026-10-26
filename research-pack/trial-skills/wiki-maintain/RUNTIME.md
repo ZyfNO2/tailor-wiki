@@ -11,7 +11,7 @@ node install-independent.mjs --workspace "F:\my-project"
 node install-independent.mjs --workspace "F:\my-project" --write
 ```
 
-默认安装 wiki-maintain、academic-tailor、experiment-design、research-story；只装一个时加 `--skill wiki-maintain`。四者独立，research-story 只把有证据的创新主张整理为叙事方案，不直接改论文正文。写到工作区 `.agents/skills/`，不改全局配置或 MCP，不覆盖任何已存在目录。部分安装失败保留 staging 和 install-receipt.json；先按回执核对已安装项，不盲目重装。宿主能否自动发现、是否显示 slash 命令需要实际宿主验证。
+默认安装 wiki-maintain、academic-tailor、experiment-design、research-story；只装一个时加 `--skill wiki-maintain`。四者独立，research-story 只把有证据的创新主张整理为叙事方案，不直接改论文正文。写到工作区 `.agents/skills/`，不改全局配置或 MCP，不覆盖任何已存在目录。Claude Code 读取项目 `.claude/skills/`，安装时加 `--host claude`，只写该目录，不改 `.claude/settings*.json`。部分安装失败保留 staging 和 install-receipt.json；先按回执核对已安装项，不盲目重装。宿主能否自动发现、是否显示 slash 命令需要实际宿主验证。
 
 Wiki 运行脚本为本 Skill 内的 [scripts/wiki.mjs](scripts/wiki.mjs)。从源码、解压包和已安装目录均可运行。
 
@@ -22,7 +22,7 @@ v7 新增指定范围覆盖与产物回流。仍由实际 Agent 读来源、编�
 下列 `WIKI_SCRIPT` 代表该脚本的实际绝对路径；PowerShell 中可将它赋给 `$wikiScript`。`--workspace` 始终明确命名用户批准的文件工作区，不指向旧 Core 内部目录。JSON 交接文件可放在工作区或另一个明确的任务目录；源文件只能来自 workspace 内。
 
 ```powershell
-$wikiScript = "F:\my-project\.agents\skills\wiki-maintain\scripts\wiki.mjs"
+$wikiScript = "F:\my-project\.agents\skills\wiki-maintain\scripts\wiki.mjs"  # Claude Code 安装：.claude\skills\...
 node $wikiScript prepare --workspace "F:\my-project" --input prepare.json
 node $wikiScript apply --workspace "F:\my-project" --input draft.json
 node $wikiScript status --workspace "F:\my-project"
@@ -36,7 +36,7 @@ node $wikiScript status --workspace "F:\my-project"
 {"paths":["materials","experiments/metrics.json"]}
 ```
 
-仅扫描指定路径。支持 UTF-8 Markdown、TXT、JSON、PDF。跳过 wiki 输出、.wiki、.git、.agents、旧 Core 目录、依赖、构建和常见凭证文件名。拒绝路径逃逸、符号链接和 junction；整个流程不执行来源中的命令。不存在的指定文件记暂时不可访问，局部扫描不推断其他文件被删除。
+仅扫描指定路径。支持 UTF-8 Markdown、TXT、JSON、PDF。跳过 wiki 输出、.wiki、.git、.agents、.claude、旧 Core 目录、依赖、构建和常见凭证文件名。拒绝路径逃逸、符号链接和 junction；整个流程不执行来源中的命令。不存在的指定文件记暂时不可访问，局部扫描不推断其他文件被删除。
 
 prepare 输出及 `.wiki/runs/<runId>/prepared.json` 包含：
 

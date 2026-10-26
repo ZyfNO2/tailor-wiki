@@ -11,7 +11,7 @@ const json = value => JSON.stringify(value, null, 2) + '\n';
 const fail = (code, message) => { throw new Error(`${code}: ${message}`); };
 const id = value => { if (typeof value !== 'string' || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(value)) fail('INVALID_ID', String(value)); return value; };
 const nonempty = (value, label) => { if (typeof value !== 'string' || !value.trim()) fail('EMPTY_CONTENT', label); return value; };
-const excluded = name => /^(?:\.git|\.wiki|wiki|node_modules|dist|build|coverage|\.agents|\.research|\.dsh|\.venv|venv|__pycache__|credentials|secrets)$/i.test(name) || /^(?:\.env(?:\.|$))|(?:credentials|secret|token|private)|\.(?:pem|key|pfx|p12)$/i.test(name);
+const excluded = name => /^(?:\.git|\.wiki|wiki|node_modules|dist|build|coverage|\.agents|\.claude|\.research|\.dsh|\.venv|venv|__pycache__|credentials|secrets)$/i.test(name) || /^(?:\.env(?:\.|$))|(?:credentials|secret|token|private)|\.(?:pem|key|pfx|p12)$/i.test(name);
 const supported = file => /\.(?:md|markdown|txt|json|pdf)$/i.test(file);
 const within = (root, file) => { const relative = path.relative(root, file); return relative === '' || !relative.startsWith('..') && !path.isAbsolute(relative); };
 const pageVersion = (state, pageId) => state.pageVersions && Object.hasOwn(state.pageVersions, pageId) ? state.pageVersions[pageId] : state.pages.find(p => p.pageId === pageId)?.version ?? 0;
