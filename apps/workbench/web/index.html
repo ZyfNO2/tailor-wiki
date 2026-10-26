@@ -1,0 +1,73 @@
+<!doctype html>
+<!--
+  DSH 研究工作台 · 只读展示层
+  通过 node apps/workbench/server.mjs --workspace DIR 打开：显示该工作区的真实文件（Wiki 快照、
+  TAILOR.md、RESEARCH-DAG.md、EXPERIMENT-PLAN.md、STORY-PLAN.md 等），只读，不持有写锁；
+  四个 Skill 是否在运行、工作台是否打开，互不影响。
+  直接双击本文件（file://）：显示 data.js 中的示例数据，作为设计原型。
+  变体：yellow / cool / tight / contours / compact / calm
+-->
+<html lang="zh-CN" data-ef-accent="yellow" data-ef-paper="cool" data-ef-cut="tight" data-ef-ground="contours" data-ef-density="compact" data-ef-motion="calm">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DSH 研究工作台</title>
+    <script src="assets/js/theme-init.js"></script>
+    <meta name="theme-color" content="#F0F3F5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#171A1C" media="(prefers-color-scheme: dark)" />
+    <link rel="stylesheet" href="assets/vendor/endfield.css" />
+    <link rel="stylesheet" href="assets/css/dsh.css" />
+  </head>
+  <body class="ef ef-contours">
+    <a class="dsh-skip" href="#view">跳到正文</a>
+    <div class="ef-tri" aria-hidden="true"><i></i><i></i><i></i></div>
+    <header class="ef-cmdbar dsh-cmd" id="shell-cmd"></header>
+    <div class="dsh-ctx" id="shell-ctx"></div>
+    <main id="view" class="dsh-view" tabindex="-1"></main>
+    <div class="dsh-return" id="shell-return" hidden></div>
+
+    <dialog class="dsh-side" id="dsh-side" aria-labelledby="dsh-side-title">
+      <div class="body">
+        <div class="band" aria-hidden="true"></div>
+        <header class="dsh-side-head">
+          <button type="button" class="dsh-side-back" data-side-back hidden>‹ <span></span></button>
+          <h2 class="ef-pair"><span class="ef-eyebrow slash" id="dsh-side-eyebrow"></span><span id="dsh-side-title" tabindex="-1"></span></h2>
+          <button type="button" class="ef-btn small" data-side-close>关闭</button>
+        </header>
+        <div class="dsh-side-scroll"><div id="dsh-side-body"></div></div>
+      </div>
+    </dialog>
+
+    <dialog class="dsh-palette" id="dsh-palette" aria-label="搜索对象">
+      <div class="body">
+        <header>
+          <label class="ef-search"><input id="dsh-palette-q" type="search" placeholder="输入编号或标题：W-01、R-E2-02、细裂缝…" aria-label="搜索对象" autocomplete="off" /></label>
+          <span class="ef-field" id="dsh-palette-n"></span>
+        </header>
+        <ul id="dsh-palette-list" role="listbox" aria-label="结果"></ul>
+        <footer class="ef-field">↑ ↓ 选择 │ Enter 打开 │ Esc 关闭</footer>
+      </div>
+    </dialog>
+
+    <div class="dsh-pop" id="dsh-pop" hidden tabindex="-1"></div>
+    <div class="dsh-tip" id="dsh-tip" role="tooltip" hidden></div>
+
+    <script src="assets/js/core.js"></script>
+    <script src="assets/js/derive.js"></script>
+    <script src="assets/js/ui.js"></script>
+    <script src="assets/js/drawers.js"></script>
+    <script src="assets/js/charts.js"></script>
+    <script src="assets/js/graph.js"></script>
+    <script src="assets/js/dag.js"></script>
+    <script src="assets/js/views/overview.js"></script>
+    <script src="assets/js/views/knowledge.js"></script>
+    <script src="assets/js/views/schemes.js"></script>
+    <script src="assets/js/views/experiments.js"></script>
+    <script src="assets/js/views/dagview.js"></script>
+    <script src="assets/js/views/tasks.js"></script>
+    <script src="assets/js/views/story.js"></script>
+    <script src="assets/js/views/spec.js"></script>
+    <script src="assets/js/app.js"></script>
+    <script src="assets/js/live.js"></script>
+  </body>
+</html>

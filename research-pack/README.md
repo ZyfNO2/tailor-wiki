@@ -98,7 +98,7 @@ flowchart LR
 | `install-independent.mjs` | 将四个独立 Skill 安装到指定工作区 |
 | `research-intent.mjs`、[ENTRYPOINTS.md](ENTRYPOINTS.md) | 四个短意图的本地只读交接；保留宿主内置 `/init`，不冒充原生菜单注册 |
 
-工作台作为展示层推进；静态参考原型不等于已完成的 WeKnora 源码剪枝。完整图谱、DAG 白板与 Team 界面仍需设计和接线，见 [UI 设计需求](../planning/2026-10-25/ui-design-handoff/UI-DESIGN-BRIEF.md)。
+工作台作为展示层推进；静态参考原型不等于已完成的 WeKnora 源码剪枝。完整图谱、DAG 白板与 Team 界面仍需设计和接线，见 [UI 设计需求](../planning/2026-10-25/ui-design-handoff/UI-DESIGN-BRIEF.md)。源码仓库中的只读工作台（apps/workbench）读取 Wiki 快照与四个 Skill 的产物文件做展示，不随本技能包分发；本包的安装与使用不依赖它。
 
 ## 🚀 Quick Start
 
@@ -132,7 +132,7 @@ Claude Code 用户加 `--host claude`，安装到项目 `.claude/skills/`，见 
 | 全范围覆盖对账的程序强制检查 | requestScope、版本绑定阅读证明、跨请求未读待办已实现；字节对账不是语义证明 |
 | 短意图入口、读取适配 | 本地 research-intent 可用，真实 DSH filesystem provider 发现四 Skill 已验；原生 slash 未注册 |
 | 只读 Wiki reader | 原 WK Vue/TDesign reader/version 裁剪接线，验证记录随工程交付；不是完整工作台 |
-| 知识图谱与 DAG 白板 | 仍为设计/接线阶段 |
+| 知识图谱与 DAG 白板 | 源码仓库只读工作台已接入 Wiki 快照、RESEARCH-DAG.md 等实际文件；不随本包分发，不影响 Skill |
 | Claude Code 安装 | `--host claude` 安装到项目 `.claude/skills/`；扫描排除 `.claude/`；未在活会话验证菜单 |
 | Team | 占位，后续可选扩展 |
 | DSH 插件同步 | 后于技能包更新，独立验收与发布 |

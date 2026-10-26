@@ -11,6 +11,8 @@
     "test": "node --test tests/file-wiki/*.spec.mjs",
     "build:skills": "node scripts/build-independent-skills.mjs",
     "test:reader": "npm --prefix apps/wiki-reader test",
+    "test:workbench": "node --test apps/workbench/tests/*.spec.mjs",
+    "workbench": "node apps/workbench/server.mjs",
     "build:reader": "npm --prefix apps/wiki-reader run build"
   },
   "dependencies": {
