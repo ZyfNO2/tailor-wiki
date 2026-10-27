@@ -23,6 +23,9 @@ export function createWorkbenchServer(workspace, opt = {}) {
   return http.createServer(async (req, res) => {
     try {
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Read only', { Allow: 'GET, HEAD', 'Content-Type': 'text/plain; charset=utf-8' });
+      // Loopback names only: a page on another domain that rebinds its name to
+      // 127.0.0.1 must not read the workspace through this server.
+      if (!/^(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/i.test(req.headers.host ?? '')) return send(res, 403, 'Forbidden host', { 'Content-Type': 'text/plain; charset=utf-8' });
       const url = new URL(req.url, 'http://localhost');
       if (url.pathname === '/api/identity') return json(res, 200, identity);
       if (url.pathname === '/api/workbench') {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { FileWiki } from '../../../research-pack/trial-skills/wiki-maintain/scripts/wiki.mjs';
@@ -91,6 +92,10 @@ test('server is GET-only and serves only its own web files', { timeout: 10000 },
     const res = await fetch(s.url + '/');
     assert.match(res.headers.get('content-security-policy'), /script-src 'self';/);
     assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+    // Another host name (DNS rebinding) is refused; loopback names are served.
+    const status = host => new Promise((resolve, reject) => http.get({ host: '127.0.0.1', port: new URL(s.url).port, path: '/api/identity', headers: { Host: host } }, r => { r.resume(); resolve(r.statusCode); }).on('error', reject));
+    assert.equal(await status('attacker.example:80'), 403);
+    assert.equal(await status(`localhost:${new URL(s.url).port}`), 200);
   } finally { await s.close(); }
   const index = fs.readFileSync(path.join(appRoot, 'web/index.html'), 'utf8');
   assert.equal([...index.matchAll(/<script(?![^>]*\bsrc=)[^>]*>/g)].length, 0, 'no inline scripts, so CSP stays strict');
