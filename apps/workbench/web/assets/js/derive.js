@@ -117,7 +117,11 @@
       exec: count(p.tasks, 'exec'),
       review: count(p.tasks, 'review'),
       coverage: count(covered, 'status'),
-      coverageTotal: covered.length,
+      /* 扫描项、登记来源、排除项是不同口径：实时数据给出 counts 时一律用它 */
+      coverageTotal: p.counts ? p.counts.inScope : covered.length,
+      scanned: p.counts ? p.counts.scanned : covered.length,
+      registered: p.counts ? p.counts.registered : covered.filter((s) => !s.inventoryOnly).length,
+      excludedTotal: p.counts ? p.counts.excluded : covered.filter((s) => s.status === 'excluded').length,
       missingSources: (p.sources || []).filter((s) => s.status === 'missing'),
       issuesOpen,
       runs: count(realRuns, 'status'),

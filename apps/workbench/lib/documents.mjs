@@ -159,7 +159,7 @@ export function parsePlan(md, opt = {}) {
 /** RESEARCH-DAG.md: node table, edge table (or a Mermaid preview). */
 export function parseDag(md, opt = {}) {
   const doc = renderMarkdown(md, { ...opt, idPrefix: 'dg' });
-  const notes = [];
+  const notes = [], warnings = [];
   const nodeT = findTable(doc.tables, [[/任务(?:ID|标识|编号)|^(?:ID|编号|标识|节点)$/i]]) ?? findTable(doc.tables, [[/任务/], [/状态/]]);
   const edgeT = findTable(doc.tables, [[/前置|上游|^from$/i], [/后续|下游|^to$/i]]);
   const tasks = [];
@@ -183,14 +183,43 @@ export function parseDag(md, opt = {}) {
   let edges = [];
   if (edgeT) {
     const c = { from: col(edgeT.headers, /前置|上游|^from$/i), to: col(edgeT.headers, /后续|下游|^to$/i), wait: col(edgeT.headers, /产物|条件|等待|说明/) };
-    edges = edgeT.rows.map((row, k) => ({ from: lead(cell(row, c.from)), to: lead(cell(row, c.to)), wait: cell(row, c.wait) || '未写明', note: `RESEARCH-DAG.md 第 ${edgeT.lines[k]} 行`, line: edgeT.lines[k] })).filter(e => e.from && e.to);
+    // An endpoint must be an ID; placeholder text such as "（暂无后续）" is a
+    // row without a dependency, reported but never turned into a node.
+    const idOf = v => (String(v ?? '').trim().match(/^[A-Za-z][\w.-]*/) ?? [null])[0];
+    edgeT.rows.forEach((row, k) => {
+      const from = idOf(cell(row, c.from)), to = idOf(cell(row, c.to));
+      if (!from || !to) { warnings.push(`RESEARCH-DAG.md 第 ${edgeT.lines[k]} 行“${cell(row, c.from) || '空'} → ${cell(row, c.to) || '空'}”有一端不是任务 ID（占位文字），没有画成依赖。`); return; }
+      edges.push({ from, to, wait: cell(row, c.wait) || '未写明', note: `RESEARCH-DAG.md 第 ${edgeT.lines[k]} 行`, line: edgeT.lines[k] });
+    });
   } else {
     for (const m of md.matchAll(/```mermaid\n([\s\S]*?)```/g)) {
       for (const e of m[1].matchAll(/([A-Za-z][\w-]*)(?:\[[^\]\n]*\]|\([^)\n]*\)|\{[^}\n]*\})?\s*-{2,}>(?:\|([^|\n]*)\|)?\s*([A-Za-z][\w-]*)/g)) edges.push({ from: e[1], to: e[3], wait: e[2]?.trim() || '未写明', note: '来自 Mermaid 预览（没有依赖边表）' });
     }
     if (edges.length) notes.push('依赖来自 Mermaid 预览；文件中没有依赖边表。');
   }
-  return { tasks, edges, notes, html: doc.html, toc: doc.headings.filter(h => h.level <= 3).map(h => ({ id: h.id, t: h.text })), title: doc.title };
+  return { tasks, edges, notes, warnings, html: doc.html, toc: doc.headings.filter(h => h.level <= 3).map(h => ({ id: h.id, t: h.text })), title: doc.title };
+}
+
+// Items of one section, from a table (a text column plus optional "next
+// step"/"reason" columns) or from top-level list items, de-duplicated. A
+// missing section and an unreadable one are different results, and neither
+// is reported as zero items: the unreadable section keeps its own text.
+function sectionItems(doc, heading, opt = {}) {
+  const sec = doc.sections.find(s => heading.test(s.text));
+  if (!sec) return { status: 'missing', items: [], html: null };
+  const tables = doc.tables.filter(t => t.line > sec.line && t.line <= sec.endLine), seen = new Set(), items = [];
+  const push = (text, extra = {}) => { const t = String(text ?? '').trim(), key = squash(t); if (!t || blank(t) || seen.has(key)) return; seen.add(key); items.push({ text: t, ...extra }); };
+  for (const t of tables) {
+    const textCol = Math.max(0, col(t.headers, ...(opt.text ?? [/缺口|事项|内容|补证|问题|项目/])));
+    const next = col(t.headers, /下一步|补证方式|做法|行动|计划|方式/), why = col(t.headers, /原因|理由|为什么|依据/);
+    t.rows.forEach(row => push(cell(row, textCol), { next: next >= 0 && next !== textCol ? cell(row, next) || null : null, why: why >= 0 && why !== textCol ? cell(row, why) || null : null }));
+  }
+  if (!tables.length) {
+    const bullets = sec.markdown.split('\n').map(l => l.match(/^(\s*)(?:[-*+]|\d+[.)])\s+(.*)$/)).filter(Boolean), depth = m => m[1].replace(/\t/g, '    ').length;
+    const top = Math.min(...bullets.map(depth));
+    bullets.filter(m => depth(m) === top).forEach(m => push(plainInline(m[2])));
+  }
+  return items.length ? { status: 'ok', items, html: null } : { status: 'unparsed', items: [], html: renderMarkdown(sec.markdown, { ...opt.render, idPrefix: 'sx' }).html };
 }
 
 /** STORY-PLAN.md: main thread, contribution-evidence table, figures, gaps. */
@@ -215,7 +244,9 @@ export function parseStory(md, opt = {}) {
   const figures = figT && figT !== t
     ? figT.rows.map((row, k) => ({ id: `F${k + 1}`, title: cell(row, col(figT.headers, /图|表/)) || `图表 ${k + 1}`, question: cell(row, col(figT.headers, /问题|回答/)) || null, materials: cell(row, col(figT.headers, /素材|材料|数据/)) || null, status: 'unknown', statusText: cell(row, col(figT.headers, /状态/)) || null, refs: [] }))
     : items(section(/图表/)).map((x, k) => ({ id: `F${k + 1}`, title: x, question: null, materials: null, status: 'unknown', statusText: null, refs: [] }));
-  const gaps = items(section(/补证|缺口|待补/)).map((x, k) => ({ id: `G${k + 1}`, text: x, next: null, refs: [] }));
-  const weak = items(section(/不宜|强表述|慎用/));
-  return { thread, contributions, figures, gaps, weak, html: doc.html, toc: doc.headings.filter(h => h.level <= 3).map(h => ({ id: h.id, t: h.text })), title: doc.title, hasTable: !!t };
+  const gapList = sectionItems(doc, /补证|证据缺口|待补|缺口/, { render: opt });
+  const weakList = sectionItems(doc, /不宜|强表述|慎用|禁用|避免使用|不要使用|禁止使用/, { text: [/表述|说法|用语|措辞/], render: opt });
+  const gaps = gapList.items.map((x, k) => ({ id: `G${k + 1}`, text: x.text, next: x.next ?? null, refs: [] }));
+  const weak = weakList.items.map(x => x.text);
+  return { thread, contributions, figures, gaps, gapsStatus: gapList.status, gapsHtml: gapList.html, weak, weakStatus: weakList.status, weakHtml: weakList.html, html: doc.html, toc: doc.headings.filter(h => h.level <= 3).map(h => ({ id: h.id, t: h.text })), title: doc.title, hasTable: !!t };
 }

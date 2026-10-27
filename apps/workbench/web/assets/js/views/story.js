@@ -61,13 +61,17 @@
 
           ${s.weak && s.weak.length ? html`
           <h2 class="dsh-h2">${ui.pair('Avoid', '目前不宜使用的强表述')}</h2>
-          <ul class="dsh-ul ef-read">${s.weak.map((w) => html`<li>${w}</li>`)}</ul>` : ''}
+          <ul class="dsh-ul ef-read">${s.weak.map((w) => html`<li>${w}</li>`)}</ul>` : s.weakStatus === 'unparsed' ? html`
+          <h2 class="dsh-h2">${ui.pair('Avoid', '目前不宜使用的强表述')}</h2>
+          ${ui.notice('未识别', html`<p>这一节没有可识别的列表或表格，按原文显示。</p>`)}${ui.md(s.weakHtml)}` : ''}
 
           ${doc.html ? html`<details class="dsh-docbox"><summary>${icon('file')}STORY-PLAN.md 原文</summary>${ui.md(doc.html)}</details>` : ''}
         </article>
         <aside class="dsh-margin" data-scroll-key="margin" aria-label="补证事项">
-          <h2 class="dsh-margin-h">${ui.pair('Evidence gaps', '最少补证事项')} <span class="ef-field">${s.gaps.length}</span></h2>
-          ${s.gaps.length ? html`<ol class="dsh-gaps">${s.gaps.map((g) => html`<li id="gap-${g.id}"><p><span class="dsh-id">${g.id}</span> <b>${g.text}</b></p></li>`)}</ol>` : html`<p class="ef-empty">文件中没有补证事项小节。</p>`}
+          <h2 class="dsh-margin-h">${ui.pair('Evidence gaps', '最少补证事项')} <span class="ef-field">${s.gapsStatus === 'unparsed' ? '未识别' : s.gaps.length}</span></h2>
+          ${s.gaps.length ? html`<ol class="dsh-gaps">${s.gaps.map((g) => html`<li id="gap-${g.id}"><p><span class="dsh-id">${g.id}</span> <b>${g.text}</b></p>${g.next ? html`<p class="dsh-note">下一步：${g.next}</p>` : ''}</li>`)}</ol>`
+            : s.gapsStatus === 'unparsed' ? html`${ui.notice('未识别', html`<p>补证小节没有可识别的列表或表格，按原文显示，不计为 0 项。</p>`)}${ui.md(s.gapsHtml)}`
+              : html`<p class="ef-empty">文件中没有补证事项小节。</p>`}
           <p class="ef-actions">${ui.btn('跳到实验计划', { act: 'go', data: { href: '#/experiments/plan' } })}</p>
           <h2 class="dsh-margin-h">${ui.pair('Boundary', '边界')}</h2>
           <p class="dsh-note">这一页只展示 STORY-PLAN.md，不生成或修改论文正文。</p>

@@ -674,7 +674,7 @@
               <section class="ef-panel">
                 <h2>${ui.pair('Full coverage', '全量覆盖')}</h2>
                 <p class="dsh-chiprow">${ui.st('fresh', covState[0], { text: covState[1] })}</p>
-                <p>${st.coverageTotal} 个来源中 <b>${complete}</b> 个完整处理；${st.coverage.partial || 0} 个部分处理，${st.coverage.failed || 0} 个失败或不支持，${st.coverage.excluded || 0} 个按指令排除。</p>
+                <p>${p.counts ? html`扫描 ${st.scanned} 项，明确排除 ${st.excludedTotal} 项；范围内 ${st.coverageTotal} 项中` : html`${st.coverageTotal} 个来源中`} <b>${complete}</b> 个完整处理；${st.coverage.partial || 0} 个部分处理，${st.coverage.failed || 0} 个失败或不支持${p.counts ? '' : html`，${st.coverage.excluded || 0} 个按指令排除`}。</p>
                 <p class="ef-field">完整 = 本轮处理 ${st.coverage.processed || 0} + 未变复用 ${st.coverage.reused || 0}</p>
               </section>
               <section class="ef-panel">
@@ -726,14 +726,21 @@
         DSH.state.pageLabel = '来源列表';
         const cnt = {};
         Object.values(db.cites).forEach((c) => (cnt[c.source] = (cnt[c.source] || 0) + 1));
-        const fs = DSH.vs('kb-src', { q: '' });
+        const fs = DSH.vs('kb-src', { q: '', kind: 'all' });
         const q = fs.q.trim().toLowerCase();
-        const rows = p.sources.filter((s) => !q || (s.id + ' ' + s.path + ' ' + s.kind).toLowerCase().includes(q));
+        const inKind = (s) => fs.kind === 'registered' ? !s.inventoryOnly : fs.kind === 'excluded' ? s.inventoryOnly && s.status === 'excluded' : fs.kind === 'other' ? s.inventoryOnly && s.status !== 'excluded' : true;
+        const rows = p.sources.filter((s) => inKind(s) && (!q || (s.id + ' ' + s.path + ' ' + s.kind).toLowerCase().includes(q)));
         return html`
           ${head}
           <div class="dsh-page">
             ${banner}
-            ${ui.head({ zh: '来源', en: 'Sources', desc: '原始材料是事实来源。这里列出范围内的全部文件和被引用的缺失文件；点一行查看引用片段与原文上下文。', facts: [`${p.sources.length} 个文件`, `${Object.keys(db.cites).length} 处引用`] })}
+            ${ui.head({ zh: '来源', en: 'Sources', desc: '原始材料是事实来源。这里列出范围内的全部文件和被引用的缺失文件；点一行查看引用片段与原文上下文。', facts: p.counts ? [`登记来源 ${p.counts.registered}`, `扫描项 ${p.counts.scanned}（明确排除 ${p.counts.excluded}）`, `${Object.keys(db.cites).length} 处引用`] : [`${p.sources.length} 个文件`, `${Object.keys(db.cites).length} 处引用`] })}
+            ${p.counts ? html`<div class="dsh-toolbar">${ui.chips([
+              { key: 'all', label: '全部', n: p.sources.length, on: fs.kind === 'all' },
+              { key: 'registered', label: '登记来源', n: p.counts.registered, on: fs.kind === 'registered' },
+              { key: 'excluded', label: '明确排除', n: p.sources.filter((s) => s.inventoryOnly && s.status === 'excluded').length, on: fs.kind === 'excluded' },
+              { key: 'other', label: '未登记（不支持 / 不可用）', n: p.sources.filter((s) => s.inventoryOnly && s.status !== 'excluded').length, on: fs.kind === 'other' },
+            ], 'src-kind', { label: '按口径筛选' })}</div>` : ''}
             <div class="dsh-toolbar">${ui.search('搜索路径、编号、性质', 'src-q', fs.q)}</div>
             <div class="ef-table-wrap">
               <table class="ef-table">
@@ -750,4 +757,5 @@
     },
   };
   DSH.on('src-q', (el) => { DSH.vs('kb-src', {}).q = el.value; DSH.render(); });
+  DSH.on('src-kind', (el) => { DSH.vs('kb-src', {}).kind = el.dataset.key; DSH.render(); });
 })();

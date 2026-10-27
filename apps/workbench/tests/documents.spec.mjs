@@ -45,3 +45,15 @@ test('story contributions keep provenance, support status and the original wordi
   const s = parseStory(md);
   assert.deepEqual(s.contributions.map(c => [c.provenance, c.state, c.statusText]), [[['current'], 'insufficient', '证据不足'], [['simulated'], 'supported', '模拟结果支持'], [['historical'], 'unknown', '—']]);
 });
+
+test('story gaps and banned wording come from lists or tables without duplicates; unreadable sections are not zero', () => {
+  const s = parseStory('# S\n\n## 最少补证事项\n\n| 缺口 | 下一步 |\n|---|---|\n| 基线口径未核对 | 运行 E1 |\n| 缺划分文件 | 补齐 splits |\n| 基线口径未核对 | 运行 E1 |\n\n## 禁用表述\n\n- 首次提出\n- 显著优于所有方法\n- 首次提出\n');
+  assert.deepEqual(s.gaps.map(g => [g.text, g.next]), [['基线口径未核对', '运行 E1'], ['缺划分文件', '补齐 splits']]);
+  assert.equal(s.gapsStatus, 'ok'); assert.deepEqual(s.weak, ['首次提出', '显著优于所有方法']); assert.equal(s.weakStatus, 'ok');
+  const list = parseStory('# S\n\n## 补证事项\n\n1. 先运行 E1\n   - 细节：确认口径\n2. 补齐划分文件\n\n## 目前不宜使用的强表述\n\n| 表述 | 原因 |\n|---|---|\n| 首次 | 未查新 |\n');
+  assert.deepEqual(list.gaps.map(g => g.text), ['先运行 E1', '补齐划分文件']); assert.deepEqual(list.weak, ['首次']);
+  const prose = parseStory('# S\n\n## 最少补证事项\n\n目前只需要补一次基线运行，其余待讨论。\n');
+  assert.equal(prose.gapsStatus, 'unparsed'); assert.deepEqual(prose.gaps, []); assert.match(prose.gapsHtml, /补一次基线运行/);
+  const none = parseStory('# S\n\n## 一句话主线\n\n主线。\n');
+  assert.equal(none.gapsStatus, 'missing'); assert.equal(none.weakStatus, 'missing');
+});

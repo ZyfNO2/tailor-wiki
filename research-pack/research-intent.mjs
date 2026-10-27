@@ -39,6 +39,29 @@ function identity(text, data) {
   }
   return ids; // Missing domain IDs remain absent; a path hash is not a Run ID.
 }
+// A JSON file is a run collection only by structure: an array (top level or
+// under runs/trials/experiments/results/records) whose every record is an
+// object with a run identity and at least one result field. Config arrays and
+// generic name/value lists never qualify; one malformed record disqualifies.
+const RUN_ID = ['runId', 'run_id', 'run', 'exp_id', 'experiment', 'trial', 'trial_id'];
+const NOT_RESULT = /^(?:seed|epochs?|steps?|iter(?:ation)?s?|index|idx|rank|gpus?|batch(?:_size)?|lr|learning_rate)$/i;
+export function runIdentity(record, allowName = false) {
+  for (const key of allowName ? [...RUN_ID, 'id', 'name'] : RUN_ID) if (typeof record[key] === 'string' && record[key].trim() || typeof record[key] === 'number') return String(record[key]);
+  return null;
+}
+export function runMetrics(record) {
+  const source = record.metrics && typeof record.metrics === 'object' && !Array.isArray(record.metrics) ? record.metrics : record;
+  const own = source === record ? ([k]) => !RUN_ID.includes(k) && !['id', 'name'].includes(k) && !NOT_RESULT.test(k) : () => true;
+  return Object.fromEntries(Object.entries(source).filter(([k, v]) => typeof v === 'number' && Number.isFinite(v) && own([k])));
+}
+export function runCollection(data) {
+  const keyed = data && typeof data === 'object' && !Array.isArray(data) ? ['runs', 'trials', 'experiments', 'results', 'records'].filter(k => Array.isArray(data[k])).map(k => [`/${k}`, data[k], ['runs', 'trials', 'experiments'].includes(k)]) : [];
+  for (const [pointer, list, allowName] of Array.isArray(data) ? [['', data, false]] : keyed) {
+    const valid = list.length > 0 && list.every(r => r && typeof r === 'object' && !Array.isArray(r) && runIdentity(r, allowName) !== null && (typeof r.status === 'string' || Object.keys(runMetrics(r)).length > 0));
+    if (valid) return { pointer, records: list, allowName };
+  }
+  return null;
+}
 function typeOf(relative) {
   const name = path.basename(relative);
   if (/^TAILOR(?:[-_.]|$)/i.test(name)) return 'method-plan';
@@ -67,7 +90,8 @@ export function readArtifacts(workspacePath, requested = []) {
   const artifacts = [...files].sort().map(relative => {
     const raw = bytes(local(root, relative)), text = new TextDecoder('utf-8', { fatal: true }).decode(raw);
     const data = relative.toLowerCase().endsWith('.json') ? JSON.parse(text) : undefined;
-    return { path: relative, fileIdentity: `file:${relative}`, sha256: sha(raw), type: typeOf(relative), domainIds: identity(text, data), content: text, ...(data !== undefined ? { data } : {}) };
+    const named = typeOf(relative), collection = data !== undefined && named === 'material' ? runCollection(data) : null;
+    return { path: relative, fileIdentity: `file:${relative}`, sha256: sha(raw), type: collection ? 'run-or-evidence-record' : named, domainIds: identity(text, data), content: text, ...(collection ? { runCollection: { pointer: collection.pointer, count: collection.records.length } } : {}), ...(data !== undefined ? { data } : {}) };
   });
   return { root, requested, artifacts, skipped, unavailable };
 }

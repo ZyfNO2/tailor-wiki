@@ -51,7 +51,7 @@
     DSH.views.overview._dial = {
       idle: total
         ? { label: '研究任务', big: total, unit: '项', sub: `完成 ${exec.done || 0} │ 运行中 ${exec.running || 0} │ 受阻 ${blockedN}` }
-        : { label: 'Wiki 页面', big: p.pages.length, unit: '页', sub: `来源 ${st.coverageTotal} │ 未解决问题 ${st.issuesOpen.length}` },
+        : { label: 'Wiki 页面', big: p.pages.length, unit: '页', sub: `登记来源 ${st.registered} │ 未解决问题 ${st.issuesOpen.length}` },
       gauges: [
         { label: '全量覆盖', value: `${covOk} / ${st.coverageTotal}`, share: share(covOk, st.coverageTotal) },
         { label: '语义复核', value: `${reviewDone} / ${reviewTotal}`, share: share(reviewDone, reviewTotal) },
@@ -93,7 +93,7 @@
               <h2>${ui.pair('Knowledge', '知识库')} <a href="#/knowledge/read">阅读</a></h2>
               <div class="ef-figs">
                 <a href="#/knowledge/read"><b>${p.pages.length}</b><span>Wiki 页</span></a>
-                <a href="#/knowledge/sources"><b>${st.coverageTotal}</b><span>登记来源</span></a>
+                <a href="#/knowledge/sources" title="扫描 ${st.scanned} 项，其中明确排除 ${st.excludedTotal} 项"><b>${st.registered}</b><span>登记来源</span></a>
                 <a href="${DSH.href('/knowledge/coverage', { status: 'partial,failed' })}" class="${st.unprocessed.length ? 'is-alert' : ''}"><b>${st.unprocessed.length}</b><span>未完整处理</span></a>
               </div>
             </section>

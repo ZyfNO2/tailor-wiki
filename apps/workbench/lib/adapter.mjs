@@ -5,7 +5,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { readArtifacts } from '../../../research-pack/research-intent.mjs';
+import { readArtifacts, runCollection, runIdentity, runMetrics } from '../../../research-pack/research-intent.mjs';
 import { skillNames, skillHosts } from '../../../research-pack/install-independent.mjs';
 import { readWiki, stamp, shortCommit } from './wiki.mjs';
 import { parseTailor, parsePlan, parseDag, parseStory, execOf, idPattern } from './documents.mjs';
@@ -32,16 +32,21 @@ function readDoc(root, rel) {
   catch { return { status: 'error', error: '不是有效的 UTF-8 文本。' }; }
 }
 const PROV = { current: 'current', actual: 'current', real: 'current', historical: 'historical', history: 'historical', report: 'historical', simulated: 'simulated', simulation: 'simulated', mock: 'simulated' };
+// Runs from one record file: a structurally valid collection gives one run per
+// record (located by JSON pointer); otherwise the file itself is one record.
+// Provenance comes only from the record or the file; never assumed current.
 function runsOf(artifact) {
-  const data = artifact.data;
-  const list = Array.isArray(data) ? data : Array.isArray(data?.runs) ? data.runs : [data];
-  return list.filter(r => r && typeof r === 'object' && !Array.isArray(r)).map((r, k) => {
-    const metrics = r.metrics && typeof r.metrics === 'object' ? Object.fromEntries(Object.entries(r.metrics).filter(([, v]) => typeof v === 'number' && Number.isFinite(v))) : null;
+  const data = artifact.data, collection = runCollection(data);
+  const fileProv = data && typeof data === 'object' && !Array.isArray(data) ? data.provenance ?? data.prov : undefined;
+  const list = collection ? collection.records : data && typeof data === 'object' && !Array.isArray(data) ? [data] : [];
+  return list.map((r, k) => {
+    const metrics = runMetrics(r), id = runIdentity(r, collection?.allowName ?? true);
     return {
-      id: String(r.runId ?? r.id ?? (list.length > 1 ? `${artifact.path}#${k + 1}` : artifact.path)), plan: r.planId ?? r.plan ?? null, task: r.taskId ?? null,
-      variant: r.variant != null ? String(r.variant) : '—', seed: r.seed != null ? String(r.seed) : '—', prov: PROV[String(r.provenance ?? r.prov ?? '').toLowerCase()] ?? 'unknown',
+      id: id ?? (list.length > 1 ? `${artifact.path}#${k + 1}` : artifact.path), plan: r.planId ?? r.plan ?? null, task: r.taskId ?? null,
+      entry: collection ? `${artifact.path}#${collection.pointer}/${k}` : artifact.path,
+      variant: r.variant != null ? String(r.variant) : '—', seed: r.seed != null ? String(r.seed) : '—', prov: PROV[String(r.provenance ?? r.prov ?? fileProv ?? '').toLowerCase()] ?? 'unknown',
       status: execOf(r.status), statusText: r.status ?? null, at: r.startedAt ? stamp(r.startedAt) : '—', dur: r.duration != null ? String(r.duration) : '—',
-      metrics: metrics && Object.keys(metrics).length ? metrics : null, note: r.note ?? r.notes ?? null, files: [artifact.path], source: null,
+      metrics: Object.keys(metrics).length ? metrics : null, note: r.note ?? r.notes ?? null, files: [artifact.path], source: null,
       firstError: r.error ? { at: '—', text: String(r.error) } : null, config: r.config ?? null, code: r.code ?? null, data: r.data ?? null, live: true,
     };
   });
@@ -108,7 +113,11 @@ export async function readWorkbench(workspacePath, opt = {}) {
 
   const taskIds = new Set(tasks.map(t => t.id));
   const missing = new Map();
-  const dagEdges = (dag?.edges ?? []).map(e => {
+  // A claim or contribution used as a dependency endpoint is a link, not a
+  // task: list it separately instead of inventing a missing task node.
+  const claimIds = new Set((story?.contributions ?? []).map(c => c.id)), claimLinks = [];
+  const claimEnd = e => [e.from, e.to].find(id => !taskIds.has(id) && (claimIds.has(id) || /^(?:C|CL|CLAIM)-?\d+$/i.test(id)));
+  const dagEdges = (dag?.edges ?? []).filter(e => (claimEnd(e) ? (claimLinks.push({ from: e.from, to: e.to, claim: claimEnd(e), wait: e.wait, note: e.note }), false) : true)).map(e => {
     for (const id of [e.from, e.to]) if (!taskIds.has(id) && !missing.has(id)) missing.set(id, { id, title: id, note: `依赖边引用了节点表中没有的 ${id}` });
     const up = tasks.find(t => t.id === e.from);
     return { from: e.from, to: e.to, wait: e.wait, note: e.note, state: !up ? 'missing' : up.exec === 'done' ? 'ok' : up.exec === 'blocked' || up.exec === 'failed' ? 'blocked' : 'wait' };
@@ -178,11 +187,11 @@ export async function readWorkbench(workspacePath, opt = {}) {
     readAt: stamp(now), readAtIso: now.toISOString(), sample: false, live: true, empty,
     files, question: story?.thread ? { text: story.thread, from: 'STORY-PLAN.md', stage: null } : schemes[0]?.question && tailor?.wholeFile === false && schemes.length === 1 ? { text: schemes[0].question, from: 'TAILOR.md', stage: null } : null,
     skills, wikiSnapshot: wikiOk ? wiki.snapshot : null, wikiGroups: wiki.wikiGroups ?? [], pages: wiki.pages ?? [], citations: wiki.citations ?? {},
-    coverage: wikiOk ? wiki.coverage : null, sources: wiki.sources ?? [], sourceContext: wiki.sourceContext ?? {}, issues: wiki.issues ?? [],
+    coverage: wikiOk ? wiki.coverage : null, sources: wiki.sources ?? [], counts: wiki.counts ?? null, sourceContext: wiki.sourceContext ?? {}, issues: wiki.issues ?? [],
     graph: { nodes: graphNodes, edges: graphEdges }, schemes, hypotheses: [], planFile: docs.plan.status === 'ok' ? { path: 'EXPERIMENT-PLAN.md', version: 'sha256 ' + docs.plan.sha256.slice(0, 8), at: docs.plan.at, change: null } : null,
-    plans, runs, reviews: [], conclusions: [], tasks, artifacts: {}, dagEdges, dagCycleEdge: null, dagMissing: [...missing.values()],
+    plans, runs, reviews: [], conclusions: [], tasks, artifacts: {}, dagEdges, dagCycleEdge: null, dagMissing: [...missing.values()], dagClaimLinks: claimLinks, dagWarnings: dag?.warnings ?? [],
     members: [], roleTemplates: [], conflicts: [], traces: wiki.traces ?? {},
-    story: docs.story.status === 'ok' ? { file: 'STORY-PLAN.md', version: 'sha256 ' + docs.story.sha256.slice(0, 8), at: docs.story.at, by: 'research-story', thread: story.thread, structure: [], claims: [], contributions: story.contributions, figures: story.figures, storylines: [], choice: null, gaps: story.gaps, weak: story.weak, live: true } : null,
+    story: docs.story.status === 'ok' ? { file: 'STORY-PLAN.md', version: 'sha256 ' + docs.story.sha256.slice(0, 8), at: docs.story.at, by: 'research-story', thread: story.thread, structure: [], claims: [], contributions: story.contributions, figures: story.figures, storylines: [], choice: null, gaps: story.gaps, gapsStatus: story.gapsStatus, gapsHtml: story.gapsHtml, weak: story.weak, weakStatus: story.weakStatus, weakHtml: story.weakHtml, live: true } : null,
     changes, recent, docs: Object.fromEntries(Object.entries(docs).map(([k, d]) => [k, { path: d.path, status: d.status, error: d.error, at: d.at, sha256: d.sha256, html: d.html ?? null, toc: d.toc ?? [], title: d.title ?? null, notes: d.notes ?? [] }])),
     schemeTables: tailor ? { check: tailor.checkTable, module: tailor.moduleTable, decisionText: tailor.decisionText } : null,
     wikiState: { journals: (wiki.journals ?? []).map(j => ({ commit: shortCommit(j.commitId), runId: j.runId })), pendingFeedback: (wiki.pendingFeedback ?? []).map(f => ({ runId: f.runId, status: f.status, paths: (f.artifacts ?? []).map(a => a.path), error: f.error })), completion: wiki.completion ?? null, semanticReview: wiki.semanticReview?.status ?? null, warnings: wiki.warnings ?? [] },

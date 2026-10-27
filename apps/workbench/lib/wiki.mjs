@@ -227,6 +227,18 @@ export async function readWiki(root, opt = {}) {
     if (e.sourceId || sourceRows.some(r => r.path === p)) continue;
     sourceRows.push({ id: 'inv-' + hashId(p), path: p, kind: kindOf(p), year: '—', status: e.status === 'unsupported' ? 'failed' : e.status, size: '—', range: '—', unread: e.status === 'unsupported' ? '全部' : null, reason: e.reason ?? null, note: null, outside: false, inventoryOnly: true });
   }
+  // Scanned inventory items, registered sources and exclusions are different
+  // populations; every view counts them from here so the numbers agree.
+  const inventory = [...coverageEntries.values()];
+  const counts = {
+    scanned: inventory.length || sources.length,
+    registered: sources.length,
+    excluded: inventory.filter(e => e.status === 'excluded').length,
+    unavailable: sources.filter(x => x.status === 'unavailable').length + inventory.filter(e => e.status === 'missing' && !e.sourceId).length,
+    unsupported: inventory.filter(e => e.status === 'unsupported').length + sources.filter(x => x.status === 'unparsed').length,
+  };
+  counts.inScope = counts.scanned - counts.excluded;
+  counts.complete = sourceRows.filter(r => !r.inventoryOnly && ['processed', 'reused'].includes(r.status)).length;
 
   const issues = (state.issues ?? []).map(q => ({
     id: q.issueId, title: String(q.description).split(/[。！？!?\n]/)[0].slice(0, 60) || q.issueId, kind: q.type, status: q.status, summary: q.description,
@@ -255,7 +267,7 @@ export async function readWiki(root, opt = {}) {
   return {
     status: warnings.length || observed.completion === 'partial' ? 'partial' : 'ok',
     commitId: state.commitId, snapshot: { version: '#' + shortCommit(state.commitId), at: stamp(state.createdAt), pages: pages.length, by: 'wiki-maintain', trace: coverage.run, commitId: state.commitId, intro: state.indexIntro ?? null },
-    pages, wikiGroups, citations, sources: sourceRows, sourceContext, issues, coverage, graphEdges, traces: runs.traces,
+    pages, wikiGroups, citations, sources: sourceRows, counts, sourceContext, issues, coverage, graphEdges, traces: runs.traces,
     completion: observed.completion, semanticReview: observed.semanticReview, journals, pendingFeedback: feedback, warnings,
     createdAt: state.createdAt,
   };

@@ -121,13 +121,19 @@
       <header class="dsh-kg-ph"><p class="ef-eyebrow slash">Health</p><h2><span>依赖状况</span></h2></header>
       ${ui.ledger([
         ['依赖环', cyc.sccs.length ? `${cyc.sccs.length} 个（${cyc.sccs.map((c) => c.join(' → ')).join('；')}）` : '没有', cyc.sccs.length > 0],
+        ['自依赖', `${cyc.selfLoops.length} 条${cyc.selfLoops.length ? '（' + cyc.selfLoops.map((e) => e.from).join('、') + '）' : ''}`, cyc.selfLoops.length > 0],
         ['缺失节点', `${(db.p.dagMissing || []).length} 个`, (db.p.dagMissing || []).length > 0],
+        db.p.live ? ['主张关联', `${(db.p.dagClaimLinks || []).length} 条（不是任务依赖）`, (db.p.dagClaimLinks || []).length > 0] : null,
         ['产物已更新', `${states.stale || 0} 条依赖`, (states.stale || 0) > 0],
         ['受阻依赖', `${states.blocked || 0} 条`, (states.blocked || 0) > 0],
         ['等待中', `${states.wait || 0} 条`],
         ['已满足', `${states.ok || 0} 条`],
       ])}
       <p class="dsh-note">${db.p.live ? '点一个任务查看输入输出、受阻原因与上下游。依赖状态按上游任务“状态”列推断：已完成 = 已满足，阻塞 / 失败 = 受阻，其余 = 等待中。' : '点一个任务查看输入输出、受阻原因、上下游与 trace。节点完成但审查没通过时，下游仍可能受阻。'}</p>
+      ${(db.p.dagClaimLinks || []).length ? html`<h3 class="dsh-sec-h">${ui.pair('Claim links', '指向主张的依赖行')}</h3>
+        <ul class="dsh-deps">${db.p.dagClaimLinks.map((e) => html`<li><span class="dsh-deps-n">${e.from} → ${e.to}</span><span class="dsh-deps-w">${e.claim} 是主张或贡献，不是任务</span><span class="ef-field">${e.note}</span></li>`)}</ul>
+        <p class="dsh-note">按文件原样列出，没有画进依赖图，也没有删除；主张与任务的关联应写在节点关联或叙事贡献表里。</p>` : ''}
+      ${(db.p.dagWarnings || []).length ? html`<h3 class="dsh-sec-h">${ui.pair('Rows without a dependency', '没有画成依赖的行')}</h3><ul class="dsh-ul">${db.p.dagWarnings.map((w) => html`<li class="dsh-note">${w}</li>`)}</ul>` : ''}
       <h3 class="dsh-sec-h">${ui.pair('Legend', '依赖的状态')}</h3>
       <ul class="dsh-edge-legend">
         ${['ok', 'wait', 'blocked', 'stale', 'missing'].map((k) => html`<li><i class="ln-dag is-${k}" aria-hidden="true"></i>${ui.st('edge', k)}</li>`)}

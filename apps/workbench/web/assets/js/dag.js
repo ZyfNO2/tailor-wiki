@@ -62,7 +62,10 @@
     const comp = {};
     sccs.forEach((c, i) => c.forEach((v) => (comp[v] = i)));
     const cycleEdges = new Set(m.edges.filter((e) => comp[e.from] != null && comp[e.from] === comp[e.to]).map((e) => e.id));
-    return { sccs, inCycle, cycleEdges };
+    /* 自依赖不构成多节点强连通分量，单独标出 */
+    const selfLoops = m.edges.filter((e) => e.from === e.to);
+    selfLoops.forEach((e) => { inCycle.add(e.from); cycleEdges.add(e.id); });
+    return { sccs, inCycle, cycleEdges, selfLoops };
   };
 
   /* 分层：最长路径定层（环上的回边不参与），层内按重心法排几轮，减少交叉 */
