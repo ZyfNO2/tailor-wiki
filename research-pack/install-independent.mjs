@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 
-export const skillNames = ['wiki-maintain', 'academic-tailor', 'experiment-design', 'research-story', 'research-guide'];
+export const skillNames = ['wiki-maintain', 'academic-tailor', 'experiment-design', 'research-story', 'research-guide', 'auto-research'];
 export const packRoot = path.dirname(fileURLToPath(import.meta.url));
 // Project skill roots per host: DSH-style providers read .agents/skills,
 // Claude Code reads .claude/skills. Choosing one never touches the other.
@@ -39,7 +39,7 @@ export function skillFiles(name, root = packRoot) {
 // page. It is display-only: no Skill imports it, --no-workbench installs the
 // same Skills without it, and an existing workbench directory is kept as is.
 // It carries its own copy of the read modules it needs in workbench/pack/.
-const WORKBENCH_DEPS = ['research-intent.mjs', 'install-independent.mjs', 'trial-skills/wiki-maintain/scripts/wiki.mjs', 'trial-skills/wiki-maintain/scripts/page-model.mjs', 'trial-skills/wiki-maintain/scripts/coverage.mjs'];
+const WORKBENCH_DEPS = ['trial-skills/academic-tailor/scripts/check-dag.mjs', 'research-intent.mjs', 'install-independent.mjs', 'trial-skills/wiki-maintain/scripts/wiki.mjs', 'trial-skills/wiki-maintain/scripts/page-model.mjs', 'trial-skills/wiki-maintain/scripts/coverage.mjs'];
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const present = file => { try { fs.lstatSync(file); return true; } catch { return false; } };
 export function workbenchFiles(root = packRoot) {

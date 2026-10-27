@@ -17,7 +17,7 @@ export { DOCS };
 // Experiment and story outputs flow back into the Wiki by default; the guide,
 // learner answers and the tailor/DAG files do not.
 const FEEDBACK_DOCS = ['plan', 'story'];
-const SKILL_LABEL = { 'wiki-maintain': 'Wiki 整理', 'academic-tailor': '学术裁缝', 'experiment-design': '实验设计', 'research-story': '研究叙事', 'research-guide': '研究导学' };
+const SKILL_LABEL = { 'wiki-maintain': 'Wiki 整理', 'academic-tailor': '学术裁缝', 'experiment-design': '实验设计', 'research-story': '研究叙事', 'research-guide': '研究导学', 'auto-research': '自动研究' };
 
 /** Bounded, link-refusing UTF-8 read of one workspace-root file. */
 function readDoc(root, rel) {
@@ -182,7 +182,7 @@ export async function readWorkbench(workspacePath, opt = {}) {
   };
   const latestTrace = Object.entries(wiki.traces ?? {}).sort((a, b) => String(b[1].sortAt).localeCompare(String(a[1].sortAt)))[0]?.[0] ?? null;
   const skills = skillNames.map(name => ({
-    id: name, name: SKILL_LABEL[name], file: { 'wiki-maintain': 'wiki/', 'academic-tailor': 'TAILOR.md', 'experiment-design': 'EXPERIMENT-PLAN.md', 'research-story': 'STORY-PLAN.md', 'research-guide': 'RESEARCH-GUIDE.md' }[name],
+    id: name, name: SKILL_LABEL[name], file: { 'wiki-maintain': 'wiki/', 'academic-tailor': 'TAILOR.md', 'experiment-design': 'EXPERIMENT-PLAN.md', 'research-story': 'STORY-PLAN.md', 'research-guide': 'RESEARCH-GUIDE.md', 'auto-research': '各阶段文件与 trace' }[name],
     output: skillOut[name] ?? null, at: name === 'wiki-maintain' ? wiki.snapshot?.at ?? null : docs[{ 'academic-tailor': 'tailor', 'experiment-design': 'plan', 'research-story': 'story', 'research-guide': 'guide' }[name]]?.at ?? null,
     trace: name === 'wiki-maintain' ? latestTrace : null, installed: installs[name],
   }));

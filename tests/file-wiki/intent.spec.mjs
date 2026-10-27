@@ -8,6 +8,25 @@ import { installIndependent } from '../../research-pack/install-independent.mjs'
 import { pathToFileURL } from 'node:url';
 
 const setup = () => { const root = fs.mkdtempSync(path.join(os.tmpdir(), 'research-intent-fixture-')); installIndependent(root, undefined, true); return root; };
+test('auto handoff discovers the installed router without declaring a PDF-only workspace empty or granting execution', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auto-intent-'));
+  fs.mkdirSync(path.join(root, 'materials'));
+  fs.writeFileSync(path.join(root, 'materials/paper.pdf'), '%PDF-fixture');
+  installIndependent(root, undefined, true);
+  const before = fs.readFileSync(path.join(root, 'materials/paper.pdf'));
+  const result = await resolveIntent(root, { intent: '/auto-research' });
+  assert.equal(result.skill, 'auto-research');
+  assert.equal(result.allowInternet, true);
+  const offline = await resolveIntent(root, { intent: '/auto-resaech', allowInternet: false });
+  assert.equal(offline.skill, 'auto-research'); assert.equal(offline.allowInternet, false);
+  assert.equal(result.status, 'agent-handoff');
+  assert.deepEqual(result.questions, []);
+  assert.equal(result.execution.authorizedToRun, false);
+  assert.equal(result.nativeSlashRegistered, false);
+  assert.ok(result.installedSkill.endsWith('auto-research/SKILL.md') || result.installedSkill.endsWith('auto-research\\SKILL.md'));
+  assert.deepEqual(fs.readFileSync(path.join(root, 'materials/paper.pdf')), before);
+});
+
 test('guide installs and routes independently, discovers guide but does not implicitly ingest personal practice', async () => {
   const root = setup();
   fs.writeFileSync(path.join(root, 'RESEARCH-GUIDE.md'), '# Learning route');
@@ -20,13 +39,13 @@ test('guide installs and routes independently, discovers guide but does not impl
   assert.equal(result.handoff.wikiFeedback, null);
   assert.equal(result.execution.authorizedToRun, false);
 });
-test('empty init asks goal and internet preference; never registers or shadows host init', async () => {
+test('empty init asks only the missing goal and defaults public research online; never registers or shadows host init', async () => {
   const root = setup(), before = fs.readdirSync(root), result = await resolveIntent(root, { intent: '/init' });
   assert.equal(result.status, 'needs-input'); assert.equal(result.skill, 'wiki-maintain'); assert.equal(result.localEntry, 'research-init');
-  assert.equal(result.nativeSlashRegistered, false); assert.equal(result.questions.length, 2); assert.equal(result.execution.authorizedToRun, false);
+  assert.equal(result.nativeSlashRegistered, false); assert.equal(result.questions.length, 1); assert.equal(result.execution.authorizedToRun, false);
   assert.deepEqual(fs.readdirSync(root), before);
   assert.equal((await resolveIntent(root, { intent: 'research-init' })).intent, 'init');
-  assert.equal((await resolveIntent(root, { intent: 'init', goal: 'Concrete damage' })).questions.length, 1);
+  assert.equal((await resolveIntent(root, { intent: 'init', goal: 'Concrete damage' })).questions.length, 0);
   assert.equal((await resolveIntent(root, { intent: 'init', goal: 'Concrete damage', allowInternet: false })).status, 'agent-handoff');
 });
 test('soft dependency skips Wiki and earlier stages; exp cannot authorize execution', async () => {

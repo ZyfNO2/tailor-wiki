@@ -92,6 +92,21 @@ test('experiment retrospective and progress review are read from their sections,
   assert.deepEqual(parseRetro('# 计划\n\n| 实验标识 | 状态 |\n|---|---|\n| E1 | 未运行 |\n', 'EXPERIMENT-PLAN.md'), { retros: [], progress: null });
 });
 
+test('multi-ID edges, priority-first gap tables and labelled guide questions preserve their content', async () => {
+  const { parseDag, parseGuide, parseStory } = await import('../lib/documents.mjs');
+  const dag = '| 任务 ID | 目标 |\n|---|---|\n| A | a |\n| B | b |\n| C | c |\n\n| 前置 | 后续 |\n|---|---|\n| A+B | C、MISSING |';
+  const parsed = parseDag(dag);
+  assert.deepEqual(parsed.edges.map(e => [e.from, e.to]), [['A','C'],['A','MISSING'],['B','C'],['B','MISSING']]);
+  assert.equal(parseDag(dag.replace('C、MISSING', 'C 或 MISSING')).warnings.length, 1);
+  const story = parseStory('# 故事\n## 补证事项\n| 优先级 | 需要补什么 |\n|---|---|\n| 1 | 核对误差 |\n| 2 | 补充消融 |');
+  assert.deepEqual(story.gaps.map(x => x.text), ['核对误差','补充消融']);
+  assert.equal(story.gapsStatus, 'ok');
+  const unknown = parseStory('# 故事\n## 补证事项\n| 优先级 | 未知列 |\n|---|---|\n| 1 | 不可丢失 |');
+  assert.equal(unknown.gapsStatus, 'unparsed'); assert.deepEqual(unknown.gaps, []); assert.match(unknown.gapsHtml, /不可丢失/);
+  const guide = parseGuide('# 导学\n## 理解题\n**题目**：\n\n> AUC 升而 ECE 恶化意味着什么？');
+  assert.deepEqual(guide.questions, ['AUC 升而 ECE 恶化意味着什么？']); assert.equal(guide.questionsStatus, 'ok');
+});
+
 test('tailor goal alignment separates expression, evidence, experiment and method gaps', async () => {
   const { parseTailor } = await import('../lib/documents.mjs');
   const md = '# 方案\n\n## 目标对齐\n\n| 目标 | 现有依据 | 缺口 | 类别 | 下一步 |\n|---|---|---|---|---|\n| 提高细裂缝召回 | E1 报告 | 证据不足 | 证据缺口 | 运行 E1 |\n| 讲清动机 | 草稿 | 表述不清 | 表达不清 | 改写叙事 |\n| 跨数据集泛化 | 无 | 没有对应实验 | 实验缺口 | 设计 E5 |\n| 实时性 | — | 现有模块太慢 | 方法缺口 | 换模块 |\n| 噪声标注 | 已有对照 | — | 已有支持 | — |\n| 部署平台 | ？ | 待确认 | 待确认 | 问用户 |\n';

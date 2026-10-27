@@ -17,3 +17,4 @@ const load = rel => import(pathToFileURL(path.join(packRoot, rel)).href);
 export const { readArtifacts, runCollection, runIdentity, runMetrics } = await load('research-intent.mjs');
 export const { skillNames, skillHosts } = await load('install-independent.mjs');
 export const { FileWiki } = await load('trial-skills/wiki-maintain/scripts/wiki.mjs');
+export const { dependencyIds } = await load('trial-skills/academic-tailor/scripts/check-dag.mjs');

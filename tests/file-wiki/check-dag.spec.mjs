@@ -11,6 +11,17 @@ const script = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..
 const nodes = rows => `| 任务 ID | 目标 | 预期产物 | 状态 |\n|---|---|---|---|\n${rows.map(r => `| ${r.join(' | ')} |`).join('\n')}\n`;
 const edges = rows => `| 前置 | 后续 | 所需产物/条件 |\n|---|---|---|\n${rows.map(r => `| ${r.join(' | ')} |`).join('\n')}\n`;
 
+test('all dependency IDs participate in missing endpoint and cycle checks; prose is rejected', () => {
+  const base = nodes([['A', 'a'], ['B', 'b'], ['C', 'c']]);
+  const found = checkDag(base + '\n' + edges([['A', 'B、C、MISSING'], ['C', 'A']]));
+  assert.equal(found.ok, false); assert.equal(found.edges, 4);
+  assert.ok(found.errors.some(e => e.code === 'cycle'));
+  assert.ok(found.errors.some(e => e.code === 'missing-endpoint' && e.ids.includes('MISSING')));
+  const many = checkDag(base + '\n' + edges([['A+B', 'C']]));
+  assert.equal(many.ok, true); assert.equal(many.edges, 2);
+  assert.equal(checkDag(base + '\n' + edges([['A', 'B 或 C']])).ok, false);
+});
+
 test('DAG check reports duplicates, missing endpoints, self-dependencies, cycles and claims used as tasks, with file lines', () => {
   const md = `# DAG\n\n## 节点\n\n${nodes([['T1', '准备数据', 'splits.json', '已完成'], ['T2', '训练', 'runs/T2', '未运行'], ['T2', '重复行', '—', '未运行'], ['T3', '汇总', 'report.md', '未开始']])}\n## 依赖\n\n${edges([['T1', 'T2', 'splits.json'], ['T2', 'T2', '自身'], ['T2', 'T3', '结果'], ['T3', 'T2', '回环'], ['T9', 'T3', '外部脚本'], ['C1', 'T3', '主张'], ['T3', '（暂无后续）', '—']])}`;
   const r = checkDag(md, { file: 'RESEARCH-DAG.md', claims: ['C1'] });

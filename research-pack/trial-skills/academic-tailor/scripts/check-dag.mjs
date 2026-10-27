@@ -15,6 +15,14 @@ const idPattern = id => new RegExp(`(?<![A-Za-z0-9_-])${id.replace(/[.*+?^${}()|
 const PLACEHOLDER = /^[（(]?\s*(?:暂无|无|没有|none|n\/a|—|–|-)/i;
 const SEPARATOR = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/;
 
+// A list means all named tasks. Reject prose/alternatives instead of dropping
+// their suffix and accidentally validating a different graph.
+export function dependencyIds(value) {
+  const raw = plain(value).replace(/<br\s*\/?>/gi, ',');
+  const ids = raw.split(/[、,，+＋;；]/).map(s => s.trim());
+  return ids.length && ids.every(id => /^[A-Za-z][\w.-]*$/.test(id)) ? [...new Set(ids)] : null;
+}
+
 function splitRow(line) {
   let s = line.trim();
   if (s.startsWith('|')) s = s.slice(1);
@@ -83,9 +91,9 @@ export function checkDag(markdown, opt = {}) {
     for (const r of edgeTable.rows) {
       const ends = [plain(r.cells[from]), plain(r.cells[to])];
       if (ends.some(v => !v || PLACEHOLDER.test(v))) { warnings.push({ code: 'placeholder-endpoint', at: at(r.line), ids: ends.filter(Boolean), message: `依赖行“${ends[0] || '空'} → ${ends[1] || '空'}”有一端是占位文字；没有前置或后续时不写这条边，合法的独立节点保留在节点表即可。` }); continue; }
-      const [a, b] = ends.map(lead);
-      if (!a || !b) { errors.push({ code: 'missing-endpoint', at: at(r.line), ids: ends, message: `依赖行“${ends[0]} → ${ends[1]}”的端点不是可识别的 ID。` }); continue; }
-      edges.push({ from: a, to: b, line: r.line });
+      const [fromIds, toIds] = ends.map(dependencyIds);
+      if (!fromIds || !toIds) { errors.push({ code: 'missing-endpoint', at: at(r.line), ids: ends, message: `依赖行“${ends[0]} → ${ends[1]}”不能完整解析；请明确全部任务 ID 或将条件分支单独记录，不截取首个 ID。` }); continue; }
+      for (const a of fromIds) for (const b of toIds) edges.push({ from: a, to: b, line: r.line });
     }
   } else if (tasks.size > 1) notes.push({ code: 'no-edge-table', at: at(1), ids: [], message: '没有依赖边表；如果任务之间确有依赖，请补上前置、后续与所需产物。' });
 

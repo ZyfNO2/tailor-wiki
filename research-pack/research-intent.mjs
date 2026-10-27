@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
-export const intents = Object.freeze({ init: 'wiki-maintain', tailor: 'academic-tailor', exp: 'experiment-design', story: 'research-story', guide: 'research-guide' });
+export const intents = Object.freeze({ init: 'wiki-maintain', tailor: 'academic-tailor', exp: 'experiment-design', story: 'research-story', guide: 'research-guide', 'auto-research': 'auto-research' });
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const error = (code, message) => { throw new Error(`${code}: ${message}`); };
 // wiki/ is the Wiki's own published output; it is read through the runtime's
@@ -97,9 +97,9 @@ export function readArtifacts(workspacePath, requested = []) {
 }
 
 export async function resolveIntent(workspacePath, input = {}) {
-  const raw = String(input.intent ?? '').replace(/^\//, ''), intent = raw === 'research-init' ? 'init' : raw;
+  const raw = String(input.intent ?? '').replace(/^\//, ''), intent = raw === 'research-init' ? 'init' : raw === 'auto-resaech' ? 'auto-research' : raw;
   const skill = intents[intent];
-  if (!skill) error('UNKNOWN_INTENT', 'use init/research-init, tailor, exp or story');
+  if (!skill) error('UNKNOWN_INTENT', 'use init/research-init, tailor, exp, story, guide or auto-research');
   const projection = readArtifacts(workspacePath, input.paths ?? []), root = projection.root;
   const skillCandidates = skillDirs.map(dir => local(root, `${dir}/${skill}/SKILL.md`));
   const skillFile = skillCandidates.find(file => fs.existsSync(file)) ?? skillCandidates[0];
@@ -120,21 +120,21 @@ export async function resolveIntent(workspacePath, input = {}) {
   const goal = typeof input.goal === 'string' ? input.goal.trim() : '';
   const hasMaterial = projection.artifacts.length > 0 || wiki.pages.length > 0;
   const questions = intent === 'init' && !hasMaterial
-    ? [...(!goal ? ['本次研究目标或主题是什么？'] : []), ...(typeof input.allowInternet !== 'boolean' ? ['是否允许联网检索，还是只使用你提供的本地材料？'] : [])]
-    : !hasMaterial && !goal ? ['请提供本阶段的方案、材料路径或具体目标；无需先完成其他 Skill。'] : [];
+    ? (!goal ? ['本次研究目标或主题是什么？'] : [])
+    : intent !== 'auto-research' && !hasMaterial && !goal ? ['请提供本阶段的方案、材料路径或具体目标；无需先完成其他 Skill。'] : [];
   const blockers = [];
   if (!installed) blockers.push({ code: 'SKILL_NOT_INSTALLED', path: skillFile, searched: skillCandidates });
   if (projection.unavailable.length) blockers.push({ code: 'INPUT_UNAVAILABLE', paths: projection.unavailable.map(f => f.path) });
-  if (wiki.status === 'recovery-required' && intent === 'init') blockers.push({ code: 'WIKI_RECOVERY_REQUIRED', journals: wiki.journals.map(j => j.commitId) });
+  if (wiki.status === 'recovery-required' && ['init', 'auto-research'].includes(intent)) blockers.push({ code: 'WIKI_RECOVERY_REQUIRED', journals: wiki.journals.map(j => j.commitId) });
   return {
     intent, skill, localEntry: intent === 'init' ? 'research-init' : intent,
     nativeSlashRegistered: false, nativeInitPolicy: 'preserve host /init; use this CLI research-init or invoke wiki-maintain by name',
     status: blockers.length ? 'blocked' : questions.length ? 'needs-input' : 'agent-handoff',
-    goal, allowInternet: typeof input.allowInternet === 'boolean' ? input.allowInternet : null, questions, blockers, installedSkill: installed ? skillFile : null,
+    goal, allowInternet: typeof input.allowInternet === 'boolean' ? input.allowInternet : true, questions, blockers, installedSkill: installed ? skillFile : null,
     skillContent: installed ? textFile(skillFile) : null,
     workspace: root, wiki, artifacts: projection.artifacts, skipped: projection.skipped, unavailable: projection.unavailable,
     execution: { mode: 'design-or-review', authorizedToRun: false, reason: '/exp alone never grants execution; this read-only resolver does not execute research or dispatch Agents' },
-    handoff: { next: 'Current Agent reads the selected Skill and actual inputs, performs only the requested stage; preserve existing IDs and prior work.', previousStagesRequired: false, wikiFeedback: ['exp', 'story'].includes(intent) ? 'After saving changed outputs, invoke Wiki incremental feedback with those paths; do not rerun experiments for sync retry and do not recursively invoke research.' : null },
+    handoff: { next: intent === 'auto-research' ? 'Current Agent inventories the workspace, reads auto-research, selects and executes applicable Skills; verify prior experiment authorization before new runs. No automatic execution by this resolver.' : 'Current Agent reads the selected Skill and actual inputs, performs only the requested stage; preserve existing IDs and prior work.', previousStagesRequired: false, wikiFeedback: ['exp', 'story'].includes(intent) ? 'After saving changed outputs, invoke Wiki incremental feedback with those paths; do not rerun experiments for sync retry and do not recursively invoke research.' : null },
   };
 }
 

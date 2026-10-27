@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createWorkbenchServer } from '../server.mjs';
 import { openWorkbench, probe } from '../open.mjs';
-import { installIndependent, packRoot } from '../../../research-pack/install-independent.mjs';
+import { installIndependent, packRoot, skillNames } from '../../../research-pack/install-independent.mjs';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.resolve(appRoot, '../..');
@@ -91,7 +91,7 @@ test('the installer adds the read-only workbench by default; --no-workbench inst
   assert.equal(c.workbench.status, 'exists'); assert.equal(fs.readFileSync(path.join(kept, '.agents/workbench/mine.txt'), 'utf8'), 'user file');
   assert.equal(fs.existsSync(path.join(kept, '.agents/workbench/open.mjs')), false);
   const cli = JSON.parse(spawnSync(process.execPath, [path.join(repo, 'research-pack/install-independent.mjs'), '--workspace', workspace(), '--no-workbench', '--write'], { encoding: 'utf8' }).stdout);
-  assert.equal(cli.workbench.status, 'skipped'); assert.equal(cli.destinations.length, 5);
+  assert.equal(cli.workbench.status, 'skipped'); assert.equal(cli.destinations.length, skillNames.length);
   // The installed copy reads with its own pack modules, not the repository's.
   const pack = await import(pathToFileURL(path.join(wb, 'lib/pack.mjs')).href);
   assert.equal(pack.packRoot, path.join(wb, 'pack'));

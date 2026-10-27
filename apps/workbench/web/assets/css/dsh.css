@@ -618,9 +618,9 @@ button.ef-tag { cursor: pointer; }
 .dsh-cat-count { margin: 0.55rem 0.3rem 0; }
 .dsh-cat-g { display: flex; align-items: baseline; justify-content: space-between; margin: 1rem 0.25rem 0.25rem; padding-bottom: 0.25rem; border-bottom: 1px solid var(--ef-ink); font-size: 0.82rem; font-weight: 800; }
 .dsh-cat-list { margin: 0; padding: 0; list-style: none; }
-.dsh-cat-it { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.1rem 0.5rem; padding: 0.45rem calc(0.5rem + var(--ef-cut)) 0.45rem 0.35rem; color: var(--ef-ink); }
-.dsh-cat-it .dsh-id { grid-row: span 2; align-self: start; margin-top: 0.1rem; }
-.dsh-cat-it .t { font-size: 0.86rem; font-weight: 600; line-height: 1.4; }
+.dsh-cat-it { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.3rem; padding: 0.65rem calc(0.5rem + var(--ef-cut)) 0.65rem 0.35rem; color: var(--ef-ink); }
+.dsh-cat-it .dsh-id { grid-row: auto; justify-self: start; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.dsh-cat-it .t { min-width: 0; font-size: 0.86rem; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
 .dsh-cat-it .m { font-size: 0.7rem; }
 .dsh-cat-it .warn { padding: 0 0.25em; background: var(--ef-signal); color: var(--ef-on-signal); font-weight: 700; }
 .dsh-cat-it:hover { background: linear-gradient(-45deg, transparent calc(var(--ef-cut) - 0.5px), var(--ef-chip) var(--ef-cut)); }
@@ -707,8 +707,11 @@ button.ef-tag { cursor: pointer; }
 .dsh-split { display: grid; grid-template-columns: minmax(18rem, 27rem) minmax(0, 1fr); }
 .dsh-split-list { min-height: 0; overflow: auto; padding: 1rem 1rem 3rem; border-right: 1px solid var(--ef-rule); }
 .dsh-split-list .dsh-chips { margin: 0.25rem 0 0.75rem; }
-.dsh-split-list .dsh-record { grid-template-columns: auto minmax(0, 1fr) auto; }
-.dsh-split-list .dsh-record > .ef-field { grid-column: 2 / -1; }
+.dsh-split-list .dsh-record { grid-template-columns: minmax(0, 1fr); gap: 0.4rem; }
+.dsh-split-list .dsh-record > * { grid-column: 1; min-width: 0; max-width: 100%; }
+.dsh-split-list .dsh-record > .dsh-id { justify-self: start; white-space: normal; overflow-wrap: anywhere; }
+.dsh-split-list .dsh-record > .name { grid-column: 1; overflow-wrap: anywhere; }
+.dsh-split-list .dsh-record > .ef-field { grid-column: 1; }
 .dsh-split-main { min-width: 0; min-height: 0; overflow: auto; padding: 1.6rem var(--ef-pad) 4rem; background: var(--ef-panel); }
 .dsh-split-main > * { max-width: 52rem; }
 .dsh-sides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; max-width: 60rem !important; }

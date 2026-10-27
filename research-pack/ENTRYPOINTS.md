@@ -1,10 +1,11 @@
-# 五个研究意图入口
+# 研究意图入口与自动路由
 
-这是本地只读路由与当前 Agent 的交接协议，不是总 Skill，不启动模型、实验、Team 或联网，也不注册任何宿主原生命令。五个原 Skill 名继续有效。
+脚本是本地只读路由与当前 Agent 的交接协议，不启动模型、实验、Team 或联网，也不注册宿主原生命令。auto-research 是另一个轻量总路由 Skill，由当前 Agent 阅读后执行；五个专业 Skill 继续独立有效。
 
 | 本地意图 | Skill | 默认边界 |
 |---|---|---|
-| init / research-init | wiki-maintain | 恢复或整理指定材料；无材料询问目标与联网意愿 |
+| auto-research | auto-research | 根据当前工作区自主推进；默认联网、常规步骤自主推进，高风险操作需具体授权 |
+| init / research-init | wiki-maintain | 恢复或整理指定材料；无材料仅询问缺失目标；默认联网查公开资料 |
 | tailor | academic-tailor | 直接读取现有论文、代码或目标，交付方案和任务 DAG |
 | exp | experiment-design | 设计或分析已有结果；命令本身不构成执行授权 |
 | guide | research-guide | 围绕目标学习论文与代码，不要求前序阶段 |
@@ -25,7 +26,7 @@ node research-intent.mjs --workspace "F:\my-project" --input intent.json
 {"intent":"story","goal":"把当前方法设计组织为待验证叙事","paths":["TAILOR.md","EXPERIMENT-PLAN.md"]}
 ```
 
-当前 Agent 读取返回的 `installedSkill` / `skillContent`、用户目标和材料，再实际使用对应 Skill。无前序 Wiki 或方案不构成全局门禁；缺输入只阻塞依赖它的分支。无材料 init 已有 goal 时不重复问目标；没有明确 `allowInternet:true|false` 时仍询问联网意愿，脚本本身从不联网。
+当前 Agent 读取返回的 `installedSkill` / `skillContent`、用户目标和材料，再实际使用对应 Skill。无前序 Wiki 或方案不构成全局门禁；缺输入只阻塞依赖它的分支。无材料 init 已有 goal 时不重复问目标；`allowInternet` 默认 true，用户明确禁止时传 false，脚本本身从不联网。
 
 路径只读取已明确指定的目录/文件，另探测工作区根已有的 TAILOR.md、RESEARCH-DAG.md、EXPERIMENT-PLAN.md、STORY-PLAN.md。返回原文、SHA256、文件相对身份及能明确解析的 planId/designId/taskId/runId/researchId/storyId；没有 domain ID 就保留未知，不把文件 hash 冒充实验 Run ID。只读投影不建立第二状态库。JSON 解析失败、超限、路径逃逸会报错；不支持格式、缺文件显式列出，不把它们当空成功。
 
@@ -39,7 +40,7 @@ Claude Code 从项目 `.claude/skills/<name>/SKILL.md` 发现 Skill。安装时�
 node install-independent.mjs --workspace "F:\my-project" --host claude --write
 ```
 
-按 Claude Code 约定，五个 Skill 以原名调用（`/wiki-maintain`、`/academic-tailor`、`/experiment-design`、`/research-story`、`/research-guide`），或直接描述任务由 Claude 按 description 选用。Claude Code 内置 `/init` 用于生成 CLAUDE.md，本分发不占用；整理/恢复 Wiki 用 `wiki-maintain` 或本地 `--intent research-init`。
+按 Claude Code 约定，六个 Skill 以原名调用（`/wiki-maintain`、`/academic-tailor`、`/experiment-design`、`/research-story`、`/research-guide`、`/auto-research`），或直接描述任务由 Claude 按 description 选用。Claude Code 内置 `/init` 用于生成 CLAUDE.md，本分发不占用；整理/恢复 Wiki 用 `wiki-maintain` 或本地 `--intent research-init`。
 
 `research-intent.mjs` 同时识别 `.agents/skills` 与 `.claude/skills`。Wiki 扫描和产物读取跳过 `.claude/`，不把 Skill 说明或本地设置当作研究材料。仓库测试验证安装布局、frontmatter 约束与安装后的运行助手，未在活 Claude Code 会话验证菜单显示。
 
@@ -48,3 +49,7 @@ node install-independent.mjs --workspace "F:\my-project" --host claude --write
 已安装 DSH 的 filesystem provider 确认支持项目 `.agents/skills`，而同一项目 `.dsh/skills` 具有更高优先级。它会向上寻找最近 `.git` 作为项目根；在某个 Git 仓库子目录安装后，从子目录启动并不保证扫描该子目录下的 `.agents/skills`。应安装到实际项目根，或由宿主显式配置 customSkillDirs；不要据独立安装器成功推断活宿主发现。
 
 本轮已在隔离项目根使用真实已安装 provider 的 list/get 读到五个 Skill，详见工程验证记录。该调用未启动活 DSH 会话，也未修改用户配置，未验证 slash UI、真实模型运行或权限系统。完整名称调用是跨宿主兼容方式。
+
+`--intent auto-research` 只把总路由交给 Agent，不因根目录缺少标准产物就要求用户提供材料；Agent 须先盘点工作区（含 PDF）。resolver 的 authorizedToRun=false 表示脚本不授权实验；实际 Agent 根据用户既有授权决定是否需审批。
+
+本地 `--intent auto-resaech` 兼容错拼并映射到 auto-research；不创建宿主错拼 slash 命令。

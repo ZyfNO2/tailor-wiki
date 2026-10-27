@@ -73,7 +73,7 @@
 | 同一证据多种表达 | research-story 指定简版故事/组会/开题用途 | 只交付所需形式，证据口径保持一致 |
 | 研究进度回顾 | experiment-design 中要求回顾/继续 | 已交付、受阻、待验证、下一步与文件依据 |
 
-导学和答辩不是研究必经步骤；练习需要用户真实回答，不由 Agent 自问自答。个人回答不默认写入 Wiki。以上机制参考 [ASu-skills](https://github.com/Hisn00w/ASu-skills) 的目标匹配、导学、证据复盘与追问方式，改写为科研场景；不是原仓库已有科研功能。`/auto-research` 仍待单独实施审批。
+导学和答辩不是研究必经步骤；练习需要用户真实回答，不由 Agent 自问自答。个人回答不默认写入 Wiki。以上机制参考 [ASu-skills](https://github.com/Hisn00w/ASu-skills) 的目标匹配、导学、证据复盘与追问方式，改写为科研场景；不是原仓库已有科研功能。`/auto-research` 已提供轻量总路由：读取工作区，自主选择后续阶段，默认联网、常规步骤自主推进；重大分支按代选授权处理，高风险操作需具体授权。
 
 | 能力 | 用户体验 | 保留的边界 |
 | --- | --- | --- |
@@ -113,8 +113,8 @@ flowchart LR
 | `trial-skills/academic-tailor/` | 裁缝方案、核验表与任务 DAG |
 | `trial-skills/experiment-design/` | 实验计划、交接与维护要求 |
 | `trial-skills/research-story/` | 研究主线、贡献证据与维护要求 |
-| `install-independent.mjs` | 将五个独立 Skill 安装到指定工作区 |
-| `research-intent.mjs`、[ENTRYPOINTS.md](ENTRYPOINTS.md) | 五个短意图的本地只读交接；保留宿主内置 `/init`，不冒充原生菜单注册 |
+| `install-independent.mjs` | 将五个专业 Skill 与 auto-research 安装到指定工作区 |
+| `research-intent.mjs`、[ENTRYPOINTS.md](ENTRYPOINTS.md) | 专业入口及 auto-research 的本地只读交接；保留宿主内置 `/init`，不冒充原生菜单注册 |
 
 工作台作为展示层推进；静态参考原型不等于已完成的 WeKnora 源码剪枝。完整图谱、DAG 白板与 Team 界面仍需设计和接线，见 [UI 设计需求](../planning/2026-10-25/ui-design-handoff/UI-DESIGN-BRIEF.md)。只读工作台（源码在 apps/workbench）随包放在 `workbench/`，安装时默认复制到工作区 `<宿主目录>/workbench/`，加 `--no-workbench` 跳过；Skill 不导入它，没有它也照常使用。它读取 Wiki 快照与五个 Skill 的产物文件做展示，不执行、不审批、不调度。
 
@@ -126,7 +126,7 @@ flowchart LR
 # 预览安装内容
 node install-independent.mjs --workspace "F:\my-research"
 
-# 安装五个独立 Skill
+# 安装全部 Skill（含 auto-research）
 node install-independent.mjs --workspace "F:\my-research" --write
 ```
 
@@ -165,3 +165,32 @@ Claude Code 用户加 `--host claude`，安装到项目 `.claude/skills/`，见 
 - [WeKnora](https://github.com/Tencent/WeKnora)：Wiki 候选、引用、合并及阅读机制的参考；本包不是其完整部署。
 - [四 Skill 编排与工程边界](../planning/2026-10-26/SOFT-SKILL-FLOW.md)。
 - 各 Skill 的 `references/` 保留课程、论文与工程参考的采用边界，不把参考方法当已验证研究收益。
+
+## 一键推进研究
+
+安装全部 Skill 后输入 `/auto-research`，Agent 会从当前工作区恢复进度，整理资料、提出候选、设计或分析实验、组织故事，并增量维护 Wiki、交付工作台。已有结果优先分析，不为了流程重跑；导学按需使用。默认联网检索公开资料，无需另说“允许联网”；常规选择和成本明确的小检查自行推进。重大分支需要判断时集中询问，用户说“放手／不用问”则代选继续；高风险操作仍需具体授权。
+
+这是 Agent 使用指导，不是后台自动执行引擎。宿主不支持斜杠发现时，可直接要求“读取 auto-research/SKILL.md 并推进当前工作区”；实际菜单发现与一键行为需在目标宿主验收。
+
+### 只给资料，自动推进
+
+```text
+/auto-research 这份毕业论文.pdf
+```
+
+Agent 自行拆解多项研究工作，追查各项基线与模块的原论文/官方代码，区分前人组件、论文作者改动和本轮建议；围绕真实缺口提出可检验候选。方法数据流与研究任务 DAG 分开生成、自检，新增材料和实验/故事产物增量进入 Wiki，工作台展示并核对实际文件。无代码或数据时先完成可做的方案，不虚构实验结果。
+
+用户只需说明例外，例如“不要联网”“不要运行实验”或“分支你决定”。自然语言中误写 auto-resaech 可识别为同一意图，本地路由也兼容；宿主斜杠菜单使用正式名 `/auto-research`，不声称已注册错拼别名。
+
+## 只用 Skill，不用工作台
+
+工作台可选。首次在解压包目录安装到新工作区时：
+
+```powershell
+node install-independent.mjs --workspace "F:\my-research" --no-workbench --write
+# Claude Code 加上 --host claude
+```
+
+然后直接给资料并输入 `/auto-research 论文.pdf`。Wiki、方法方案、研究任务 DAG、实验计划及故事都以文件交付，Markdown/Mermaid 可直接阅读；引文、DAG 自检及 Wiki 增量维护不依赖 UI。未安装工作台时正常交付文件，不自动补装、不要求用户启动服务。若已有工作台但不想用，明确说“不用工作台”即可；该安装选项不删除旧 UI。
+
+论文检索允许摘要替代：遇到付费墙、拿不到全文时，可使用实际论文摘要继续整理和候选筛选，明确标注“仅摘要已读／全文未获取”；不据此编造方法实现或实验细节，也不要求用户购买全文。

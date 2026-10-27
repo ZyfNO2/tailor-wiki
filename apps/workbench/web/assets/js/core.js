@@ -436,14 +436,14 @@
 
   /* ---------- 12. 深浅切换：从按钮处扩散一个圆；减少动效时直接切换 ---------- */
   const theme = {
-    get() { return document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); },
+    get() { return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'; },
     set(t) {
       document.documentElement.dataset.theme = t;
       try { localStorage.setItem('theme', t); } catch {}
       this.sync();
       DSH.emit && DSH.emit('theme');
     },
-    /* 没有保存过选择时跟随系统；只同步按钮状态，不写入 */
+    /* 默认浅色；只同步按钮状态，不修改保存的偏好。 */
     sync() { $$('[data-act="theme"]').forEach((b) => b.setAttribute('aria-pressed', String(this.get() === 'dark'))); },
   };
   DSH.theme = theme;
@@ -475,6 +475,5 @@
     pop.init();
     tip.init();
     theme.sync();
-    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => theme.sync());
   };
 })();

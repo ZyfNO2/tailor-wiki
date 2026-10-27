@@ -2,6 +2,7 @@
 // state explicitly: the tables each Skill prescribes and "字段：值" lines.
 // Anything else stays in the rendered document; nothing is inferred from prose.
 import { renderMarkdown, plainInline, firstParagraph } from './markdown.mjs';
+import { dependencyIds } from './pack.mjs';
 
 const squash = s => String(s ?? '').replace(/\s+/g, '');
 export const col = (headers, ...patterns) => headers.findIndex(h => patterns.some(re => re.test(squash(h))));
@@ -194,11 +195,10 @@ export function parseDag(md, opt = {}) {
     const c = { from: col(edgeT.headers, /前置|上游|^from$/i), to: col(edgeT.headers, /后续|下游|^to$/i), wait: col(edgeT.headers, /产物|条件|等待|说明/) };
     // An endpoint must be an ID; placeholder text such as "（暂无后续）" is a
     // row without a dependency, reported but never turned into a node.
-    const idOf = v => (String(v ?? '').trim().match(/^[A-Za-z][\w.-]*/) ?? [null])[0];
     edgeT.rows.forEach((row, k) => {
-      const from = idOf(cell(row, c.from)), to = idOf(cell(row, c.to));
-      if (!from || !to) { warnings.push(`RESEARCH-DAG.md 第 ${edgeT.lines[k]} 行“${cell(row, c.from) || '空'} → ${cell(row, c.to) || '空'}”有一端不是任务 ID（占位文字），没有画成依赖。`); return; }
-      edges.push({ from, to, wait: cell(row, c.wait) || '未写明', note: `RESEARCH-DAG.md 第 ${edgeT.lines[k]} 行`, line: edgeT.lines[k] });
+      const fromIds = dependencyIds(cell(row, c.from)), toIds = dependencyIds(cell(row, c.to));
+      if (!fromIds || !toIds) { warnings.push(`RESEARCH-DAG.md 第 ${edgeT.lines[k]} 行“${cell(row, c.from) || '空'} → ${cell(row, c.to) || '空'}”无法完整解析为任务 ID；未绘制该行，图不完整，请核对原文。`); return; }
+      for (const from of fromIds) for (const to of toIds) edges.push({ from, to, wait: cell(row, c.wait) || '未写明', note: `RESEARCH-DAG.md 第 ${edgeT.lines[k]} 行`, line: edgeT.lines[k] });
     });
   } else {
     for (const m of md.matchAll(/```mermaid\n([\s\S]*?)```/g)) {
@@ -218,8 +218,10 @@ function sectionItems(doc, heading, opt = {}) {
   if (!sec) return { status: 'missing', items: [], html: null };
   const tables = doc.tables.filter(t => t.line > sec.line && t.line <= sec.endLine), seen = new Set(), items = [];
   const push = (text, extra = {}) => { const t = String(text ?? '').trim(), key = squash(t); if (!t || blank(t) || seen.has(key)) return; seen.add(key); items.push({ text: t, ...extra }); };
+  let unreadable = false;
   for (const t of tables) {
-    const textCol = Math.max(0, col(t.headers, ...(opt.text ?? [/缺口|事项|内容|补证|问题|项目/])));
+    const textCol = col(t.headers, ...(opt.text ?? [/缺口|事项|内容|补证|问题|项目|需要补什么|待补什么/]));
+    if (textCol < 0) { unreadable = true; continue; }
     const next = col(t.headers, /下一步|补证方式|做法|行动|计划|方式/), why = col(t.headers, /原因|理由|为什么|依据/);
     t.rows.forEach(row => push(cell(row, textCol), { next: next >= 0 && next !== textCol ? cell(row, next) || null : null, why: why >= 0 && why !== textCol ? cell(row, why) || null : null }));
   }
@@ -228,7 +230,19 @@ function sectionItems(doc, heading, opt = {}) {
     const top = Math.min(...bullets.map(depth));
     bullets.filter(m => depth(m) === top).forEach(m => push(plainInline(m[2])));
   }
-  return items.length ? { status: 'ok', items, html: null } : { status: 'unparsed', items: [], html: renderMarkdown(sec.markdown, { ...opt.render, idPrefix: 'sx' }).html };
+  if (!items.length && !tables.length && opt.questions) {
+    const lines = sec.markdown.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const match = plainInline(lines[i]).match(/^(?:题目|问题)\s*[:：]\s*(.*)$/);
+      if (!match) continue;
+      const body = [match[1]];
+      while (i + 1 < lines.length && (!lines[i + 1].trim() || /^\s*>/.test(lines[i + 1]))) {
+        body.push(lines[++i].replace(/^\s*>\s?/, ''));
+      }
+      push(body.join('\n').trim());
+    }
+  }
+  return items.length && !unreadable ? { status: 'ok', items, html: null } : { status: 'unparsed', items, html: renderMarkdown(sec.markdown, { ...opt.render, idPrefix: 'sx' }).html };
 }
 
 // The default short story sits between the title and the first section:
@@ -310,7 +324,7 @@ export function parseGuide(md, opt = {}) {
   const c = routeT && { q: col(routeT.headers, /要弄懂|问题/), concepts: col(routeT.headers, /概念/), location: col(routeT.headers, /位置|章节|代码/), outcome: col(routeT.headers, /读完|能解释|理解目标|收获/), exercise: col(routeT.headers, /练习/) };
   // A dash or 'none' in a route cell means nothing was written there.
   const route = routeT ? routeT.rows.map((row, k) => { const v = i => (blank(cell(row, i)) ? null : cell(row, i)); return { step: k + 1, question: v(c.q), concepts: v(c.concepts), location: v(c.location), outcome: v(c.outcome), exercise: v(c.exercise), line: routeT.lines[k] }; }) : [];
-  const questions = sectionItems(doc, /待答|待回答|理解题|检查题|练习题|问题清单/, { render: opt });
+  const questions = sectionItems(doc, /待答|待回答|理解题|检查题|练习题|问题清单/, { render: opt, questions: true });
   return {
     title: doc.title, goal: field(md, '学习目标|研究目标|目标'), scope: field(md, '来源与阅读范围|实际阅读范围|阅读范围|来源版本'),
     route, routeStatus: routeT ? 'ok' : routeSec ? 'unparsed' : 'missing', routeHtml: !routeT && routeSec ? renderMarkdown(routeSec.markdown, { ...opt, idPrefix: 'rgr' }).html : null,
