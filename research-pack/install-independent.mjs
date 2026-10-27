@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 
-export const skillNames = ['wiki-maintain', 'academic-tailor', 'experiment-design', 'research-story'];
+export const skillNames = ['wiki-maintain', 'academic-tailor', 'experiment-design', 'research-story', 'research-guide'];
 export const packRoot = path.dirname(fileURLToPath(import.meta.url));
 // Project skill roots per host: DSH-style providers read .agents/skills,
 // Claude Code reads .claude/skills. Choosing one never touches the other.

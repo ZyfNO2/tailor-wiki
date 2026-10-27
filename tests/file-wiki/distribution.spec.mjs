@@ -12,8 +12,8 @@ import { FileWiki } from '../../research-pack/trial-skills/wiki-maintain/scripts
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'wiki-distribution-fixture-'));
-test('four independent skills validate closure, preview is read-only, selective install never overwrites', () => {
-  assert.deepEqual(skillNames, ['wiki-maintain', 'academic-tailor', 'experiment-design', 'research-story']);
+test('five independent skills validate closure, preview is read-only, selective install never overwrites', () => {
+  assert.deepEqual(skillNames, ['wiki-maintain', 'academic-tailor', 'experiment-design', 'research-story', 'research-guide']);
   for (const name of skillNames) assert.ok(skillFiles(name).some(entry => entry.file === 'SKILL.md'));
   const workspace = temp();
   assert.equal(installIndependent(workspace).mode, 'preview');
@@ -53,7 +53,7 @@ test('ZIP is self-contained, exact manifest hashes match, installed runtime comp
   for (const [name, bytes] of Object.entries(archive)) { const target = path.join(extracted, name); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, bytes); }
   const workspace = path.join(root, 'workspace'); fs.mkdirSync(workspace);
   const install = JSON.parse(execFileSync(process.execPath, [path.join(extracted, 'install-independent.mjs'), '--workspace', workspace, '--write'], { encoding: 'utf8' }));
-  assert.equal(install.destinations.length, 4);
+  assert.equal(install.destinations.length, 5);
   const intent = JSON.parse(execFileSync(process.execPath, [path.join(extracted, 'research-intent.mjs'), '--workspace', workspace, '--intent', 'research-init'], { encoding: 'utf8' }));
   assert.equal(intent.nativeSlashRegistered, false); assert.equal(intent.status, 'needs-input'); assert.equal(intent.questions.length, 2);
   assert.equal(fs.existsSync(path.join(workspace, '.agents/skills/research-story/references/sources.md')), true);

@@ -8,6 +8,18 @@ import { installIndependent } from '../../research-pack/install-independent.mjs'
 import { pathToFileURL } from 'node:url';
 
 const setup = () => { const root = fs.mkdtempSync(path.join(os.tmpdir(), 'research-intent-fixture-')); installIndependent(root, undefined, true); return root; };
+test('guide installs and routes independently, discovers guide but does not implicitly ingest personal practice', async () => {
+  const root = setup();
+  fs.writeFileSync(path.join(root, 'RESEARCH-GUIDE.md'), '# Learning route');
+  fs.writeFileSync(path.join(root, 'RESEARCH-PRACTICE.md'), 'Private learner answers');
+  const result = await resolveIntent(root, { intent: 'guide' });
+  assert.equal(result.skill, 'research-guide');
+  assert.equal(result.status, 'agent-handoff');
+  assert.ok(result.artifacts.some(a => a.path === 'RESEARCH-GUIDE.md'));
+  assert.equal(result.artifacts.some(a => a.path === 'RESEARCH-PRACTICE.md'), false);
+  assert.equal(result.handoff.wikiFeedback, null);
+  assert.equal(result.execution.authorizedToRun, false);
+});
 test('empty init asks goal and internet preference; never registers or shadows host init', async () => {
   const root = setup(), before = fs.readdirSync(root), result = await resolveIntent(root, { intent: '/init' });
   assert.equal(result.status, 'needs-input'); assert.equal(result.skill, 'wiki-maintain'); assert.equal(result.localEntry, 'research-init');
@@ -19,7 +31,7 @@ test('empty init asks goal and internet preference; never registers or shadows h
 });
 test('soft dependency skips Wiki and earlier stages; exp cannot authorize execution', async () => {
   const root = setup();
-  for (const intent of ['tailor', 'exp', 'story']) {
+  for (const intent of ['tailor', 'exp', 'story', 'guide']) {
     const result = await resolveIntent(root, { intent, goal: 'Study this direct method design.' });
     assert.equal(result.status, 'agent-handoff'); assert.equal(result.handoff.previousStagesRequired, false);
     assert.equal(result.wiki.status, 'absent'); assert.equal(result.execution.authorizedToRun, false);

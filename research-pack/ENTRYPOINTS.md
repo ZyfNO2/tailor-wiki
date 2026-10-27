@@ -1,12 +1,13 @@
-# 四个研究意图入口
+# 五个研究意图入口
 
-这是本地只读路由与当前 Agent 的交接协议，不是总 Skill，不启动模型、实验、Team 或联网，也不注册任何宿主原生命令。四个原 Skill 名继续有效。
+这是本地只读路由与当前 Agent 的交接协议，不是总 Skill，不启动模型、实验、Team 或联网，也不注册任何宿主原生命令。五个原 Skill 名继续有效。
 
 | 本地意图 | Skill | 默认边界 |
 |---|---|---|
 | init / research-init | wiki-maintain | 恢复或整理指定材料；无材料询问目标与联网意愿 |
 | tailor | academic-tailor | 直接读取现有论文、代码或目标，交付方案和任务 DAG |
 | exp | experiment-design | 设计或分析已有结果；命令本身不构成执行授权 |
+| guide | research-guide | 围绕目标学习论文与代码，不要求前序阶段 |
 | story | research-story | 可直接从方案进入，叙事保持待验证/报告归属 |
 
 宿主 `/init` 可能是内置工程初始化。此分发始终保留其行为；无冲突入口使用本地 `--intent research-init`，或直接调用 `wiki-maintain`。`/tailor`、`/exp`、`/story` 是用户表达的短意图，尚未在活 DSH 菜单注册，不能把本脚本输出称为注册成功。
@@ -46,4 +47,4 @@ node install-independent.mjs --workspace "F:\my-project" --host claude --write
 
 已安装 DSH 的 filesystem provider 确认支持项目 `.agents/skills`，而同一项目 `.dsh/skills` 具有更高优先级。它会向上寻找最近 `.git` 作为项目根；在某个 Git 仓库子目录安装后，从子目录启动并不保证扫描该子目录下的 `.agents/skills`。应安装到实际项目根，或由宿主显式配置 customSkillDirs；不要据独立安装器成功推断活宿主发现。
 
-本轮已在隔离项目根使用真实已安装 provider 的 list/get 读到四个 Skill，详见工程验证记录。该调用未启动活 DSH 会话，也未修改用户配置，未验证 slash UI、真实模型运行或权限系统。完整名称调用是跨宿主兼容方式。
+本轮已在隔离项目根使用真实已安装 provider 的 list/get 读到五个 Skill，详见工程验证记录。该调用未启动活 DSH 会话，也未修改用户配置，未验证 slash UI、真实模型运行或权限系统。完整名称调用是跨宿主兼容方式。

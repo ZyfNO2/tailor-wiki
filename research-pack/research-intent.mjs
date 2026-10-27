@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
-export const intents = Object.freeze({ init: 'wiki-maintain', tailor: 'academic-tailor', exp: 'experiment-design', story: 'research-story' });
+export const intents = Object.freeze({ init: 'wiki-maintain', tailor: 'academic-tailor', exp: 'experiment-design', story: 'research-story', guide: 'research-guide' });
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const error = (code, message) => { throw new Error(`${code}: ${message}`); };
 // wiki/ is the Wiki's own published output; it is read through the runtime's
@@ -52,7 +52,7 @@ function typeOf(relative) {
 export function readArtifacts(workspacePath, requested = []) {
   const root = fs.realpathSync(workspacePath), files = new Set(), skipped = [], unavailable = [];
   if (!Array.isArray(requested) || requested.some(p => typeof p !== 'string')) error('INVALID_INPUT', 'paths must be an array');
-  const defaults = ['TAILOR.md', 'RESEARCH-DAG.md', 'EXPERIMENT-PLAN.md', 'STORY-PLAN.md'];
+  const defaults = ['TAILOR.md', 'RESEARCH-DAG.md', 'EXPERIMENT-PLAN.md', 'STORY-PLAN.md', 'RESEARCH-GUIDE.md'];
   const visit = relative => {
     if (relative.split(/[\\/]/).some(p => excluded.has(p))) { skipped.push({ path: relative, reason: 'internal/runtime directory' }); return; }
     const file = local(root, relative);

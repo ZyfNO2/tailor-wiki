@@ -131,3 +131,14 @@ test('the Skill pack never depends on the workbench', () => {
   assert.ok(checked.length > 10);
   for (const file of checked) assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /workbench/i, file);
 });
+
+
+test('single-stage documents render without a Wiki snapshot; added skills do not crash projection', async () => {
+  for (const [file, key] of [['TAILOR.md', 'tailor'], ['RESEARCH-DAG.md', 'dag'], ['EXPERIMENT-PLAN.md', 'plan'], ['STORY-PLAN.md', 'story']]) {
+    const root = temp(); fs.writeFileSync(path.join(root, file), '# Standalone output\nActual saved content.');
+    const before = tree(root), p = await readWorkbench(root);
+    assert.equal(p.empty, false); assert.equal(p.docs[key].status, 'ok');
+    assert.equal(p.wikiSnapshot, null); assert.deepEqual(tree(root), before);
+    assert.equal(p.skills.find(s => s.id === 'research-guide').name, '研究导学');
+  }
+});

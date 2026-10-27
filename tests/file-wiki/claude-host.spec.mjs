@@ -18,7 +18,7 @@ test('Claude Code host installs only into .claude/skills, leaves settings untouc
   assert.equal(preview.mode, 'preview'); assert.equal(preview.host, 'claude');
   assert.equal(fs.existsSync(path.join(workspace, '.claude/skills')), false);
   const installed = installIndependent(workspace, undefined, true, packRoot, 'claude');
-  assert.equal(installed.destinations.length, 4);
+  assert.equal(installed.destinations.length, skillNames.length);
   for (const name of skillNames) assert.ok(fs.existsSync(path.join(workspace, '.claude/skills', name, 'SKILL.md')));
   assert.ok(fs.existsSync(path.join(workspace, '.claude/skills/wiki-maintain/scripts/wiki.mjs')));
   assert.equal(fs.existsSync(path.join(workspace, '.agents')), false);

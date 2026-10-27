@@ -25,4 +25,6 @@ NeurIPS 官方 [Paper Checklist](https://neurips.cc/public/guides/PaperChecklist
 
 ## 本项目补充
 
+2026-10-27 简版叙事补充：参考 Simon Peyton Jones 的 [Research is communication 讲义](https://www.microsoft.com/en-us/research/wp-content/uploads/2015/02/simon-peyton-jones_paper.pdf) 中问题→核心想法→数据与比较的顺序，以及 Nature Scitable 的 [Scientific Papers](https://www.nature.com/scitable/topicpage/scientific-papers-13815490/) 对研究动机和先陈述要点再给证据的建议。采用“为什么做、具体问题、怎么解决、证据支持什么”的开篇；150–300 字与证据附录是本项目为减少冗长制定的默认值，不是来源的硬性规范。
+
 主张→方法差异→问题依据→验证证据→适用边界的工作顺序，以及独立 STORY-PLAN.md、原始实验文件不改动、论文写入前确认，是本项目的组合设计，不将它们冒称为任何单份资料的原文规范。
