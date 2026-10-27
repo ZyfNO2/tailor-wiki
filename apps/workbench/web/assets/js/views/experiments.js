@@ -514,7 +514,7 @@
         <h2>${ui.pair('Execution', '执行情况分开看')} <small>计划状态来自实验表的状态列；运行性质来自记录本身</small></h2>
         <div class="dsh-plan-grid">
           ${ui.kv([['受阻 / 失败', html`${blocked.length} 个计划 ${ids(blocked)}`], ['未执行或状态未知', html`${notRun.length} 个计划 ${ids(notRun)}`], ['取消 / 淘汰', html`${cancelled.length} 个计划 ${ids(cancelled)}`]])}
-          ${ui.kv([['本轮执行的运行', `${prov('current')} 条`], ['历史报告', `${prov('historical')} 条（不是本轮结果）`], ['模拟', `${prov('simulated')} 条（不参与判定）`], ['未标注性质', `${prov('unknown')} 条`]])}
+          ${ui.kv([['标为本轮的运行记录', `${prov('current')} 条（已完成 ${runs.filter((x) => x.prov === 'current' && x.status === 'done').length} 条，其余未运行或未完成）`], ['历史报告', `${prov('historical')} 条（不是本轮结果）`], ['模拟', `${prov('simulated')} 条（不参与判定）`], ['未标注性质', `${prov('unknown')} 条`]])}
         </div>
         <p class="dsh-note">“本轮执行”只在记录写明时成立；运行过不等于主张已支持。</p>
       </section>

@@ -133,7 +133,7 @@
     return html`
       <h2 class="dsh-h2" id="sc-align" tabindex="-1">${ui.pair('Goal alignment', '目标对齐与缺口')}</h2>
       <div class="ef-table-wrap">
-        <table class="ef-table dsh-table-tight">
+        <table class="ef-table dsh-table-tight dsh-align">
           <thead><tr><th>目标</th><th>现有依据</th><th>缺口</th><th>缺口类别</th><th>下一步</th><th>关联材料</th></tr></thead>
           <tbody>${t.alignment.rows.map((r) => html`<tr>
             <td class="ef-read">${ui.val(r.goal)}</td><td>${ui.val(r.basis)}</td><td>${ui.val(r.gap)}</td>

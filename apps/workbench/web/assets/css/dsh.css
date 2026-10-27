@@ -220,6 +220,8 @@ body.ef {
 .dsh-progress .dsh-lane li .ef-field { font-size: 0.72rem; }
 .dsh-h3 { margin: 1.1rem 0 0.4rem; font-size: 0.95rem; }
 .dsh-route td.num { white-space: nowrap; }
+/* 多列原文表格：窄屏时横向滚动，不把每列挤成一个字宽 */
+.dsh-route, .dsh-align, .dsh-contrib { min-width: 46rem; }
 
 /* ---------- 2. 状态语法 ---------- */
 .st {
