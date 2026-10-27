@@ -125,11 +125,18 @@ test('problems stay local: a corrupt snapshot or broken file is reported, the re
 test('the Skill pack never depends on the workbench', () => {
   for (const name of skillNames) assert.ok(skillFiles(name).every(e => !/workbench/i.test(e.file)));
   const scan = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? scan(path.join(dir, e.name)) : [path.join(dir, e.name)]));
-  // Pack code and every installed Skill file stay workbench-free (the pack
-  // README may mention the repository app in prose; that is not a dependency).
+  // No Skill script, reference or data file refers to the workbench. SKILL.md
+  // may name the optional launcher in prose, always with the plain-file
+  // fallback; the installer copies the workbench but never imports it.
   const checked = scan(path.join(repo, 'research-pack')).filter(f => /\.(mjs|json)$/.test(f) || f.includes(`${path.sep}trial-skills${path.sep}`));
   assert.ok(checked.length > 10);
-  for (const file of checked) assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /workbench/i, file);
+  for (const file of checked) {
+    const text = fs.readFileSync(file, 'utf8');
+    if (!/workbench/i.test(text)) continue;
+    if (path.basename(file) === 'SKILL.md') { assert.match(text, /没有工作台时也直接给出文件路径/, file); continue; }
+    assert.equal(path.relative(path.join(repo, 'research-pack'), file), 'install-independent.mjs', `${file} must not refer to the workbench`);
+    assert.doesNotMatch(text, /^\s*import\b[^;]*workbench|\bimport\s*\([^)]*workbench/m, file);
+  }
 });
 
 

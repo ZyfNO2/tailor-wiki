@@ -123,12 +123,33 @@
       <p class="ef-eyebrow slash">From TAILOR.md</p>
       <p>方案按 TAILOR.md 中的方案小节列出${p.docs.tailor && p.schemes.length === 1 && p.schemes[0].source.section === '全文' ? '（文件没有分方案小节，全文作为一个方案）' : ''}。用户决策、技术就绪、证据状态只取文件里写明的“决策状态：”“技术就绪：”“证据状态：”，没写就显示未标注。</p>
       ${t.decisionText ? html`<p>文件中的决策记录：<b>${t.decisionText}</b></p>` : ''}
+      ${t.alignment ? html`<p>目标对齐表 ${t.alignment.rows.length} 行：${GAPS.map(([k]) => ({ k, n: t.alignment.rows.filter((r) => r.category === k).length })).filter((x) => x.n).map((x) => ui.label('gap', x.k) + ' ' + x.n).join(' │ ') || '没有分类'} <a href="#sc-align" data-act="toc" data-target="sc-align">查看</a></p>` : ''}
     </div>`;
+  }
+  const GAPS = [['expression'], ['evidence'], ['experiment'], ['method'], ['pending'], ['supported'], ['unknown']];
+  /* 目标对齐：目标—现有依据—缺口—下一步；缺口类别只取文件写的类别列或缺口原文 */
+  function alignment(t) {
+    if (!t.alignment) return '';
+    return html`
+      <h2 class="dsh-h2" id="sc-align" tabindex="-1">${ui.pair('Goal alignment', '目标对齐与缺口')}</h2>
+      <div class="ef-table-wrap">
+        <table class="ef-table dsh-table-tight">
+          <thead><tr><th>目标</th><th>现有依据</th><th>缺口</th><th>缺口类别</th><th>下一步</th><th>关联材料</th></tr></thead>
+          <tbody>${t.alignment.rows.map((r) => html`<tr>
+            <td class="ef-read">${ui.val(r.goal)}</td><td>${ui.val(r.basis)}</td><td>${ui.val(r.gap)}</td>
+            <td>${ui.st('gap', r.category)}${r.categoryText ? html`<div class="ef-field">${r.categoryText}</div>` : ''}</td>
+            <td>${ui.val(r.next)}</td>
+            <td>${(r.refs || []).length ? ui.refs(r.refs, { idOnly: true }) : html`<span class="muted">无</span>`}</td>
+          </tr>`)}</tbody>
+        </table>
+      </div>
+      <p class="dsh-note">TAILOR.md 第 ${t.alignment.line} 行。表达、证据、实验、方法缺口分开显示；关联材料只在方案、实验或 Wiki 页 ID 实际出现时连上。</p>`;
   }
   function liveTail(p) {
     const t = p.schemeTables || {};
     const doc = p.docs.tailor;
     return html`
+      ${alignment(t)}
       ${t.check ? html`<h2 class="dsh-h2">${ui.pair('Checks', '证据与就绪检查表（原文）')}</h2>${ui.table(t.check)}<p class="dsh-note">表格按原文列出，不把文字判成通过或失败。TAILOR.md 第 ${t.check.line} 行。</p>` : ''}
       ${t.module ? html`<h2 class="dsh-h2">${ui.pair('Modules', '模块来源表（原文）')}</h2>${ui.table(t.module)}` : ''}
       ${doc && doc.html ? html`<details class="dsh-docbox"><summary>${icon('file')}TAILOR.md 原文</summary>${ui.md(doc.html)}</details>` : ''}`;

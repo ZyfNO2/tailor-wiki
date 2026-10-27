@@ -3,7 +3,7 @@
   DSH 研究工作台 · 只读展示层
   通过 node apps/workbench/server.mjs --workspace DIR 打开：显示该工作区的真实文件（Wiki 快照、
   TAILOR.md、RESEARCH-DAG.md、EXPERIMENT-PLAN.md、STORY-PLAN.md 等），只读，不持有写锁；
-  四个 Skill 是否在运行、工作台是否打开，互不影响。
+  五个 Skill 是否在运行、工作台是否打开，互不影响。
   直接双击本文件（file://）：显示 data.js 中的示例数据，作为设计原型。
   变体：yellow / cool / tight / contours / compact / calm
 -->
@@ -23,6 +23,7 @@
     <div class="ef-tri" aria-hidden="true"><i></i><i></i><i></i></div>
     <header class="ef-cmdbar dsh-cmd" id="shell-cmd"></header>
     <div class="dsh-ctx" id="shell-ctx"></div>
+    <div class="dsh-linkbar" id="shell-link" role="status" aria-live="polite" hidden></div>
     <main id="view" class="dsh-view" tabindex="-1"></main>
     <div class="dsh-return" id="shell-return" hidden></div>
 
@@ -66,6 +67,7 @@
     <script src="assets/js/views/dagview.js"></script>
     <script src="assets/js/views/tasks.js"></script>
     <script src="assets/js/views/story.js"></script>
+    <script src="assets/js/views/guide.js"></script>
     <script src="assets/js/views/spec.js"></script>
     <script src="assets/js/app.js"></script>
     <script src="assets/js/live.js"></script>

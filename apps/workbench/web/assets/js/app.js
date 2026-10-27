@@ -18,6 +18,7 @@
     { key: 'dag', zh: 'DAG 白板', en: 'Dependencies', href: '#/dag' },
     { key: 'tasks', zh: '任务与 Team', en: 'Tasks', href: '#/tasks/list' },
     { key: 'story', zh: '研究叙事', en: 'Story', href: '#/story' },
+    { key: 'guide', zh: '研究导学', en: 'Guide', href: '#/guide' },
   ];
   DSH.NAV = NAV;
 
@@ -41,12 +42,14 @@
   R('/experiments/runs', 'exp-runs', { section: 'experiments' });
   R('/experiments/review', 'exp-review', { section: 'experiments' });
   R('/experiments/review/:id', 'exp-review', { section: 'experiments' });
+  R('/experiments/retro', 'exp-retro', { section: 'experiments' });
   R('/dag', 'dag', { section: 'dag' });
   R('/tasks', 'tasks-list', { section: 'tasks' });
   R('/tasks/list', 'tasks-list', { section: 'tasks' });
   R('/tasks/board', 'tasks-board', { section: 'tasks' });
   R('/tasks/team', 'team', { section: 'tasks' });
   R('/story', 'story', { section: 'story' });
+  R('/guide', 'guide', { section: 'guide' });
   R('/spec', 'spec', { section: 'spec' });
 
   /* ---------- 原型状态演示（只属于原型，不是产品功能） ---------- */
@@ -89,6 +92,7 @@
         ${p.wikiSnapshot ? html`<li>Wiki 快照 ${p.wikiSnapshot.version}</li>` : html`<li>无 Wiki 快照</li>`}
         <li>读取 ${p.readAt}</li>
       </ul>
+      ${p.live ? DSH.linkStatus() : ''}
       <button type="button" class="dsh-fresh" data-act="files-pop" aria-haspopup="dialog" aria-expanded="false" title="查看每个文件的读取状态">
         ${p.live ? (bad.some((f) => f.status === 'error') ? ui.st('fresh', 'error', { text: `${bad.filter((f) => f.status === 'error').length} 个读取失败 │ ${okN} / ${files.length} 正常` }) : bad.length ? ui.st('fresh', bad.some((f) => f.status === 'partial') ? 'partial' : 'missing', { text: `${okN} / ${files.length} 已读取 │ ${bad.length} 项没有或不完整` }) : ui.st('fresh', 'ok', { text: `${files.length} 项已读取` }))
           : DSH.state.proto === 'loading' ? ui.st('fresh', 'loading', { text: '正在读取 9 个文件' })
@@ -182,6 +186,7 @@
       case 'concl': return '#/experiments/review/' + (db.reviews[o.review] || {}).plan;
       case 'story': return '#/story';
       case 'contrib': case 'fig': case 'gap': return DSH.href('/story', { focus: type + '-' + id });
+      case 'step': return DSH.href('/guide', { focus: 'step-' + id });
       case 'view': return o.hash;
       default: return null;
     }
@@ -288,6 +293,7 @@
       (p.story.figures || []).forEach((x) => add('fig:' + x.id, x.id, x.title, '图表计划'));
       (p.story.gaps || []).forEach((x) => add('gap:' + x.id, x.id, x.text, '证据缺口'));
     }
+    if (p.guide) (p.guide.route || []).forEach((x) => add('step:' + x.step, '第 ' + x.step + ' 步', x.question || x.location || '', '导学路线'));
     return items;
   }
   const palette = {

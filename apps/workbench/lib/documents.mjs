@@ -89,6 +89,8 @@ export function decisionOf(value) {
 export const evidenceOf = v => (v ? (/有来源支持|有证据支持|已支持/.test(v) ? 'supported' : /部分/.test(v) ? 'partial' : /待核|待验证|未核/.test(v) ? 'pending' : /无证据|没有证据|^无$/.test(v) ? 'none' : null) : null);
 const tableOut = t => (t ? { headers: t.headers, rows: t.rows, line: t.line } : null);
 
+const gapKind = v => (blank(v) ? 'unknown' : /已有支持|已支持|无缺口/.test(v) ? 'supported' : /表达|表述|讲不清/.test(v) ? 'expression' : /证据/.test(v) ? 'evidence' : /实验/.test(v) ? 'experiment' : /方法|能力|模块/.test(v) ? 'method' : /待确认|待定/.test(v) ? 'pending' : 'unknown');
+
 /** TAILOR.md: scheme sections (explicit headings) or the whole file as one. */
 export function parseTailor(md, opt = {}) {
   const doc = renderMarkdown(md, { ...opt, idPrefix: 'tl' });
@@ -125,7 +127,14 @@ export function parseTailor(md, opt = {}) {
       html: rendered.html, toc: rendered.headings.filter(h => h.level <= 3).map(h => ({ id: h.id, t: h.text })), text: scope, live: true,
     };
   });
-  return { schemes, checkTable: tableOut(checkT), moduleTable: tableOut(moduleT), html: doc.html, toc: doc.headings.filter(h => h.level <= 3).map(h => ({ id: h.id, t: h.text })), title: doc.title, decisionText: field(md, '决策状态|用户决策|决策'), wholeFile: whole };
+  // Goal alignment: "目标—现有依据—缺口—下一步", with the gap kind taken
+  // from its own column (or the gap cell) as written.
+  const alignT = findTable(doc.tables, [[/目标/], [/依据/], [/缺口/]]);
+  const alignment = alignT ? (() => {
+    const c = { goal: col(alignT.headers, /目标/), basis: col(alignT.headers, /依据/), gap: col(alignT.headers, /缺口/), kind: col(alignT.headers, /类别|类型|分类/), next: col(alignT.headers, /下一步|后续/) };
+    return { line: alignT.line, rows: alignT.rows.map((row, k) => ({ goal: cell(row, c.goal) || null, basis: cell(row, c.basis) || null, gap: cell(row, c.gap) || null, category: gapKind(cell(row, c.kind) || cell(row, c.gap)), categoryText: cell(row, c.kind) || null, next: cell(row, c.next) || null, line: alignT.lines[k] })) };
+  })() : null;
+  return { schemes, alignment, checkTable: tableOut(checkT), moduleTable: tableOut(moduleT), html: doc.html, toc: doc.headings.filter(h => h.level <= 3).map(h => ({ id: h.id, t: h.text })), title: doc.title, decisionText: field(md, '决策状态|用户决策|决策'), wholeFile: whole };
 }
 
 /** EXPERIMENT-PLAN.md: rows of the experiment table. */
@@ -222,6 +231,48 @@ function sectionItems(doc, heading, opt = {}) {
   return items.length ? { status: 'ok', items, html: null } : { status: 'unparsed', items: [], html: renderMarkdown(sec.markdown, { ...opt.render, idPrefix: 'sx' }).html };
 }
 
+// The default short story sits between the title and the first section:
+// why — problem — approach — what the data supports. Labelled paragraphs are
+// split into those four parts; otherwise the opening is shown as written.
+const OPENING = [
+  ['why', '为什么做', /^(?:为什么(?:要)?做|动机|why)/i],
+  ['problem', '遇到什么问题', /^(?:遇到(?:了|的)?(?:什么)?(?:具体的?)?问题|(?:具体的?|核心)?问题|什么问题|problem)/i],
+  ['approach', '怎样解决', /^(?:怎样解决|怎么解决|如何解决|解决(?:办法|思路)?|方法|approach)/i],
+  ['evidence', '数据支持什么', /^(?:(?:现有)?数据支持(?:什么)?|证据(?:支持)?|还要验证|支持什么|evidence)/i],
+];
+const labelled = (text, table) => {
+  const m = plainInline(String(text).replace(/\n/g, ' ')).match(/^(.{1,14}?)[:：]\s*(.+)$/);
+  const hit = m && table.find(([, , re]) => re.test(m[1].trim()));
+  return hit ? { key: hit[0], label: hit[1], text: m[2].trim() } : null;
+};
+function storyOpening(md, opt) {
+  const lines = md.replace(/\r\n?/g, '\n').split('\n');
+  let start = 0;
+  while (start < lines.length && !lines[start].trim()) start++;
+  if (/^#\s/.test(lines[start] ?? '')) start++;
+  let end = lines.findIndex((l, k) => k >= start && /^#{1,6}\s/.test(l));
+  if (end < 0) end = lines.length;
+  const STATUS = /^(?:>\s*)?(?:\*\*)?证据状态(?:\*\*)?\s*[:：]\s*(.+)$/;
+  const paragraphs = lines.slice(start, end).join('\n').split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
+  const status = paragraphs.find(x => STATUS.test(x)), body = paragraphs.filter(x => x !== status);
+  if (!body.length) return null;
+  const parts = [];
+  for (const x of body) { const hit = labelled(x, OPENING); if (hit && !parts.some(p => p.key === hit.key)) parts.push(hit); }
+  return { statusLine: status ? plainInline(status.match(STATUS)[1]) : null, parts: parts.length >= 2 ? parts : null, html: renderMarkdown(body.join('\n\n'), { ...opt, idPrefix: 'so' }).html };
+}
+// Other forms of the same story (meeting outline, proposal abstract) are
+// shown only when the file already contains them; nothing is generated.
+const FORMATS = [['meeting', '组会汇报提纲', /组会|口头汇报|汇报提纲/], ['proposal', '开题摘要', /开题/]];
+function storyFormats(doc, opt) {
+  const found = [];
+  for (const sec of doc.sections.filter(x => x.level <= 3)) {
+    const kind = FORMATS.find(([, , re]) => re.test(sec.text));
+    if (!kind || found.some(f => sec.line > f.line && sec.line <= f.endLine)) continue;
+    found.push({ kind: kind[0], label: kind[1], title: sec.text, line: sec.line, endLine: sec.endLine, html: renderMarkdown(sec.markdown, { ...opt, idPrefix: 'sf' + sec.line }).html });
+  }
+  return found;
+}
+
 /** STORY-PLAN.md: main thread, contribution-evidence table, figures, gaps. */
 export function parseStory(md, opt = {}) {
   const doc = renderMarkdown(md, { ...opt, idPrefix: 'sp' });
@@ -248,5 +299,61 @@ export function parseStory(md, opt = {}) {
   const weakList = sectionItems(doc, /不宜|强表述|慎用|禁用|避免使用|不要使用|禁止使用/, { text: [/表述|说法|用语|措辞/], render: opt });
   const gaps = gapList.items.map((x, k) => ({ id: `G${k + 1}`, text: x.text, next: x.next ?? null, refs: [] }));
   const weak = weakList.items.map(x => x.text);
-  return { thread, contributions, figures, gaps, gapsStatus: gapList.status, gapsHtml: gapList.html, weak, weakStatus: weakList.status, weakHtml: weakList.html, html: doc.html, toc: doc.headings.filter(h => h.level <= 3).map(h => ({ id: h.id, t: h.text })), title: doc.title, hasTable: !!t };
+  return { thread, opening: storyOpening(md, opt), formats: storyFormats(doc, opt), contributions, figures, gaps, gapsStatus: gapList.status, gapsHtml: gapList.html, weak, weakStatus: weakList.status, weakHtml: weakList.html, html: doc.html, toc: doc.headings.filter(h => h.level <= 3).map(h => ({ id: h.id, t: h.text })), title: doc.title, hasTable: !!t };
+}
+
+/** RESEARCH-GUIDE.md: goal, reading scope, route table and open questions. */
+export function parseGuide(md, opt = {}) {
+  const doc = renderMarkdown(md, { ...opt, idPrefix: 'rg' });
+  const routeT = findTable(doc.tables, [[/要弄懂|问题/], [/阅读位置|位置|概念/]]);
+  const routeSec = doc.sections.find(x => /阅读路线|路线|阅读计划/.test(x.text));
+  const c = routeT && { q: col(routeT.headers, /要弄懂|问题/), concepts: col(routeT.headers, /概念/), location: col(routeT.headers, /位置|章节|代码/), outcome: col(routeT.headers, /读完|能解释|理解目标|收获/), exercise: col(routeT.headers, /练习/) };
+  // A dash or 'none' in a route cell means nothing was written there.
+  const route = routeT ? routeT.rows.map((row, k) => { const v = i => (blank(cell(row, i)) ? null : cell(row, i)); return { step: k + 1, question: v(c.q), concepts: v(c.concepts), location: v(c.location), outcome: v(c.outcome), exercise: v(c.exercise), line: routeT.lines[k] }; }) : [];
+  const questions = sectionItems(doc, /待答|待回答|理解题|检查题|练习题|问题清单/, { render: opt });
+  return {
+    title: doc.title, goal: field(md, '学习目标|研究目标|目标'), scope: field(md, '来源与阅读范围|实际阅读范围|阅读范围|来源版本'),
+    route, routeStatus: routeT ? 'ok' : routeSec ? 'unparsed' : 'missing', routeHtml: !routeT && routeSec ? renderMarkdown(routeSec.markdown, { ...opt, idPrefix: 'rgr' }).html : null,
+    questions: questions.items.map(x => x.text), questionsStatus: questions.status, questionsHtml: questions.html,
+    html: doc.html, toc: doc.headings.filter(h => h.level <= 3).map(h => ({ id: h.id, t: h.text })),
+  };
+}
+
+// Experiment retrospectives and progress reviews are sections the Skill
+// writes into result reports; they are read as written, never synthesised.
+const RETRO_PARTS = [
+  ['question', '原问题与预期', /原问题|预期/],
+  ['attempts', '实际尝试', /实际尝试|尝试|配置差异|实际运行/],
+  ['observations', '观察与失败', /观察|失败|现象/],
+  ['interpretation', '解释与边界', /解释|边界/],
+  ['next', '下一步', /下一步|后续|next/i],
+];
+const PROGRESS = [['delivered', /已交付|交付|已完成/], ['blocked', /受阻|阻塞/], ['pending', /待验证|待核实|未验证/], ['next', /下一步|后续/]];
+export function parseRetro(md, file, opt = {}) {
+  const doc = renderMarkdown(md, { ...opt, idPrefix: 'rx' });
+  const retros = doc.sections.filter(x => /复盘|retrospective/i.test(x.text)).map(sec => {
+    const parts = [];
+    for (const line of sec.markdown.split('\n')) {
+      const hit = labelled(line.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').replace(/^#{1,6}\s+/, ''), RETRO_PARTS);
+      if (hit && !parts.some(p => p.key === hit.key)) parts.push(hit);
+    }
+    return { file, title: sec.text, line: sec.line, parts, html: renderMarkdown(sec.markdown, { ...opt, idPrefix: 'rx' + sec.line }).html };
+  });
+  const sec = doc.sections.find(x => /进度回顾|研究进度|进度复盘/.test(x.text));
+  let progress = null;
+  if (sec) {
+    const groups = { delivered: [], blocked: [], pending: [], next: [] };
+    const t = doc.tables.find(x => x.line > sec.line && x.line <= sec.endLine && col(x.headers, /分组|类别|状态/) >= 0);
+    if (t) {
+      const g = col(t.headers, /分组|类别|状态/), item = col(t.headers, /事项|内容|项目|任务/), ev = col(t.headers, /证据|路径|依据/);
+      t.rows.forEach(row => { const kind = PROGRESS.find(([, re]) => re.test(cell(row, g))); if (kind) groups[kind[0]].push({ text: cell(row, item >= 0 ? item : g === 0 ? 1 : 0), evidence: ev >= 0 ? cell(row, ev) || null : null }); });
+    } else {
+      for (const sub of doc.sections.filter(x => x.line > sec.line && x.line <= sec.endLine)) {
+        const kind = PROGRESS.find(([, re]) => re.test(sub.text));
+        if (kind) sectionItems({ sections: [sub], tables: doc.tables }, /.*/, { render: opt }).items.forEach(x => groups[kind[0]].push({ text: x.text, evidence: null }));
+      }
+    }
+    progress = { file, line: sec.line, checkedAt: field(sec.markdown, '检查时间|时间'), groups, html: renderMarkdown(sec.markdown, { ...opt, idPrefix: 'rp' }).html };
+  }
+  return { retros, progress };
 }

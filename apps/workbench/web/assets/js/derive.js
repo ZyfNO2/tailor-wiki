@@ -189,6 +189,7 @@
     conflict: { zh: '冲突', icon: 'zap' },
     artifact: { zh: '产物', icon: 'box' },
     view: { zh: '页面', icon: 'arrow-r' },
+    step: { zh: '导学步骤', icon: 'book' },
   };
   DSH.TYPE = TYPE;
   const VIEWS = {
@@ -201,6 +202,8 @@
     tasks: { title: '任务', hash: '#/tasks/list' },
     team: { title: 'Team', hash: '#/tasks/team' },
     story: { title: '研究叙事', hash: '#/story' },
+    guide: { title: '研究导学', hash: '#/guide' },
+    retro: { title: '实验复盘', hash: '#/experiments/retro' },
     issues: { title: '问题', hash: '#/knowledge/issues' },
     sources: { title: '来源', hash: '#/knowledge/sources' },
   };
@@ -231,6 +234,7 @@
       case 'conflict': o = db.conflicts[id]; title = o && o.file; break;
       case 'artifact': o = db.artifacts[id]; title = o && o.path; short = o ? o.path : id; break;
       case 'view': o = VIEWS[id]; title = o && o.title; short = o ? o.title : id; break;
+      case 'step': o = db.p.guide && db.p.guide.route.find((x) => String(x.step) === id); title = o && (o.question || o.location); short = '第 ' + id + ' 步'; break;
       default: break;
     }
     return { ref, type, id, T, o, exists: !!o, title: title || '', short };

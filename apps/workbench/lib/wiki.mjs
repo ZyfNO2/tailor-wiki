@@ -4,7 +4,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { FileWiki } from '../../../research-pack/trial-skills/wiki-maintain/scripts/wiki.mjs';
+import { FileWiki } from './pack.mjs';
 import { renderMarkdown, escapeHtml } from './markdown.mjs';
 
 const pad = n => String(n).padStart(2, '0');
@@ -33,6 +33,24 @@ function contentOf(page) {
   return { text: (page.facts ?? []).map(f => f.markdown).join('\n\n'), evidence };
 }
 const lineOf = (text, byte) => Buffer.from(text).subarray(0, byte).toString('utf8').split('\n').length;
+
+// Registered source paths per published commit (for change detection) and a
+// stat-keyed hash cache so originals are re-hashed only when they change.
+const sourcePaths = new Map(), hashes = new Map();
+export function trackedSourcePaths(root) {
+  try {
+    const pointer = JSON.parse(fs.readFileSync(path.join(root, '.wiki', 'current.json'), 'utf8')), key = `${root}|${pointer.commitId}`;
+    if (!sourcePaths.has(key)) sourcePaths.set(key, JSON.parse(fs.readFileSync(path.join(root, 'wiki', 'history', pointer.commitId, 'state.json'), 'utf8')).sources.map(s => s.path));
+    return sourcePaths.get(key);
+  } catch { return []; }
+}
+function currentDigest(wiki, root, rel) {
+  const st = fs.statSync(path.join(root, rel)), key = `${root}|${rel}`, hit = hashes.get(key);
+  if (hit && hit.size === st.size && hit.mtimeMs === st.mtimeMs) return hit.sha;
+  const sha = wiki.digestSource(rel);
+  hashes.set(key, { size: st.size, mtimeMs: st.mtimeMs, sha });
+  return sha;
+}
 
 function readRuns(root, limit = 60) {
   const dir = path.join(root, '.wiki', 'runs'), traces = {}, byCommit = {}, problems = [];
@@ -127,6 +145,17 @@ export async function readWiki(root, opt = {}) {
   chain.reverse();
 
   const sources = state.sources, sourceById = new Map(sources.map(s => [s.sourceId, s]));
+  sourcePaths.set(`${root}|${state.commitId}`, sources.map(s => s.path));
+  // Originals that changed or vanished after the snapshot: the Wiki needs
+  // maintenance for them. Compared by content hash, never by timestamp alone.
+  const drift = { changed: [], missing: [], unreadable: [] };
+  for (const s of sources.filter(x => x.status === 'available')) {
+    try {
+      if (!fs.existsSync(path.join(root, s.path))) drift.missing.push(s.sourceId);
+      else if (currentDigest(wiki, root, s.path) !== s.versions.at(-1).sha256) drift.changed.push(s.sourceId);
+    } catch { drift.unreadable.push(s.sourceId); }
+  }
+  const driftOf = id => (drift.changed.includes(id) ? 'changed' : drift.missing.includes(id) ? 'missing' : drift.unreadable.includes(id) ? 'unreadable' : null);
   const contexts = state.sourceContexts ?? [], receipts = state.readReceipts ?? [];
   const coverageEntries = new Map();
   for (const request of state.coverageRequests ?? (state.coverage && state.coverage.mode !== 'legacy-unattested' ? [state.coverage] : [])) for (const e of request.entries ?? []) coverageEntries.set(e.path, e);
@@ -220,7 +249,7 @@ export async function readWiki(root, opt = {}) {
       size: v.pages?.length ? `${v.pages.length} 页` : v.text != null ? `${v.text.split('\n').length} 行` : '—',
       range: cov ? readRange(cov, total) : '—', unread: unreadRange(cov, total), reason: cov?.reason ?? v.issue ?? null,
       note: ctx?.summary ?? null, attribution: ctx?.attribution ?? null, revision: v.revision, sha256: v.sha256,
-      artifact: s.artifact ?? null, outside: false,
+      artifact: s.artifact ?? null, outside: false, drift: driftOf(s.sourceId),
     };
   });
   for (const [p, e] of coverageEntries) {
@@ -267,7 +296,7 @@ export async function readWiki(root, opt = {}) {
   return {
     status: warnings.length || observed.completion === 'partial' ? 'partial' : 'ok',
     commitId: state.commitId, snapshot: { version: '#' + shortCommit(state.commitId), at: stamp(state.createdAt), pages: pages.length, by: 'wiki-maintain', trace: coverage.run, commitId: state.commitId, intro: state.indexIntro ?? null },
-    pages, wikiGroups, citations, sources: sourceRows, counts, sourceContext, issues, coverage, graphEdges, traces: runs.traces,
+    pages, wikiGroups, citations, sources: sourceRows, counts, drift, sourceContext, issues, coverage, graphEdges, traces: runs.traces,
     completion: observed.completion, semanticReview: observed.semanticReview, journals, pendingFeedback: feedback, warnings,
     createdAt: state.createdAt,
   };

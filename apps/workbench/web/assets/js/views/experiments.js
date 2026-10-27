@@ -30,6 +30,7 @@
           { key: 'plan', zh: '计划', en: 'Plan', href: '#/experiments/plan', n: p.plans.length || null },
           { key: 'runs', zh: '运行', en: 'Runs', href: '#/experiments/runs', n: p.runs.length || null },
           { key: 'review', zh: '对比与审查', en: 'Compare & review', href: '#/experiments/review', n: db.stats.reviewChanges.length || null, alert: db.stats.reviewChanges.length > 0 },
+          ...(p.live ? [{ key: 'retro', zh: '复盘', en: 'Retrospective', href: '#/experiments/retro', n: (p.retros || []).length || null }] : []),
         ], current)}
         ${p.live ? ui.facts([pf ? `${pf.path} │ ${pf.version}` : '没有 EXPERIMENT-PLAN.md', pf ? pf.at : null, `运行记录 ${p.runs.length} 条`]) : pf ? ui.facts([`${pf.path} ${pf.version}`, pf.at, `runs/ ${db.stats.runsTotal} 条`, `历史报告 ${(db.stats.runsByProv.historical || 0)} 条`, `模拟 ${(db.stats.runsByProv.simulated || 0)} 条`]) : ui.facts(['没有实验计划'])}
       </div>`;
@@ -496,4 +497,45 @@
     },
   };
   DSH.on('rv-plan', (el) => DSH.go('#/experiments/review/' + el.dataset.key));
+
+  /* ---------- 复盘：结果报告或实验计划里的“复盘”小节，原文照录 ----------
+     先把执行情况分开：受阻、未执行、本轮、历史、模拟各自计数；复盘内容按
+     原问题与预期 / 实际尝试 / 观察与失败 / 解释与边界 / 下一步列出，没写的不补。 */
+  const RETRO = [['question', '原问题与预期'], ['attempts', '实际尝试'], ['observations', '观察与失败'], ['interpretation', '解释与边界'], ['next', '下一步']];
+  function liveRetro(p) {
+    const plans = p.plans || [], runs = p.runs || [];
+    const pick = (keys) => plans.filter((x) => keys.includes(x.exec));
+    const blocked = pick(['blocked', 'failed']), notRun = pick(['pending', 'unknown']), cancelled = pick(['cancelled', 'abandoned']);
+    const prov = (k) => runs.filter((x) => x.prov === k).length;
+    const ids = (list) => (list.length ? ui.refs(list.map((x) => 'plan:' + x.id), { idOnly: true }) : html`<span class="muted">无</span>`);
+    return html`
+      ${ui.head({ zh: '实验复盘', en: 'Retrospective', desc: '复盘来自 EXPERIMENT-PLAN.md 或启动时 --paths 指定的结果报告里的“复盘”小节，原文照录。工作台不写复盘，也不从运行记录推断结论。' })}
+      <section class="ef-panel">
+        <h2>${ui.pair('Execution', '执行情况分开看')} <small>计划状态来自实验表的状态列；运行性质来自记录本身</small></h2>
+        <div class="dsh-plan-grid">
+          ${ui.kv([['受阻 / 失败', html`${blocked.length} 个计划 ${ids(blocked)}`], ['未执行或状态未知', html`${notRun.length} 个计划 ${ids(notRun)}`], ['取消 / 淘汰', html`${cancelled.length} 个计划 ${ids(cancelled)}`]])}
+          ${ui.kv([['本轮执行的运行', `${prov('current')} 条`], ['历史报告', `${prov('historical')} 条（不是本轮结果）`], ['模拟', `${prov('simulated')} 条（不参与判定）`], ['未标注性质', `${prov('unknown')} 条`]])}
+        </div>
+        <p class="dsh-note">“本轮执行”只在记录写明时成立；运行过不等于主张已支持。</p>
+      </section>
+      ${(p.retros || []).length ? (p.retros || []).map((x) => html`
+      <section class="ef-panel dsh-mt" id="retro-${x.line}">
+        <h2>${ui.pair('Retrospective', x.title)} <small>${x.file} 第 ${x.line} 行</small></h2>
+        ${x.parts.length ? ui.kv(RETRO.map(([k, zh]) => { const part = x.parts.find((y) => y.key === k); return [zh, part ? html`<span class="ef-read">${part.text}</span>` : html`<span class="muted">文件中没有写</span>`]; })) : ui.notice('未分项', html`<p>这一节没有按“实际尝试：”“下一步：”等标签分项，按原文显示。</p>`)}
+        <details class="dsh-docbox"><summary>${icon('file')}复盘原文</summary>${ui.md(x.html)}</details>
+      </section>`) : ui.empty({ title: '还没有实验复盘。', text: '复盘由 experiment-design 在结果报告或 EXPERIMENT-PLAN.md 中写成“复盘”小节；结果报告需要在启动工作台时用 --paths 指定。', file: 'EXPERIMENT-PLAN.md', skill: 'experiment-design' })}`;
+  }
+  DSH.views['exp-retro'] = {
+    title: () => '实验复盘',
+    render() {
+      const db = DSH.db();
+      const p = db.p;
+      const h = head('retro');
+      return ui.withState({ head: h, key: null, file: 'EXPERIMENT-PLAN.md', skill: 'experiment-design', liveFile: null, emptyTitle: '还没有实验复盘。', emptyText: '复盘由 experiment-design 写成“复盘”小节。' }, (banner) => {
+        DSH.state.pageLabel = '实验复盘';
+        if (!p.live) return html`${h}<div class="dsh-page">${ui.empty({ title: '示例数据没有复盘。', text: '复盘只在连接真实工作区时从文件读取。' })}</div>`;
+        return html`${h}<div class="dsh-page">${banner}${liveRetro(p)}</div>`;
+      });
+    },
+  };
 })();

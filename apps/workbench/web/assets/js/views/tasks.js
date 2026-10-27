@@ -58,6 +58,7 @@
         <div class="dsh-page">
           ${banner}
           ${ui.head({ zh: '任务', en: 'Tasks', desc: '任务标识、目标、阶段、负责人、依赖、执行状态、审查状态、最近事件与产物。状态以文件里的实际字段为准，不另造状态。', facts: [`显示 ${rows.length} / ${p.tasks.length} 项`] })}
+          ${p.live && p.progress ? html`<details class="dsh-docbox" id="tk-progress"${DSH.vs('tk-progress', { open: true }).open ? raw(' open') : ''}><summary>${icon('tasks')}研究进度：已交付 ${p.progress.delivered.length} │ 受阻 ${p.progress.blocked.length} │ 待验证 ${p.progress.pending.length} │ 下一步 ${p.progress.next.length} │ Wiki 回流 ${(p.wikiFeedback || []).filter((f) => f.status === 'synced').length} / ${(p.wikiFeedback || []).length}</summary>${ui.progress(p.progress, { max: 4 })}<h3 class="dsh-h3">Wiki 回流</h3>${ui.feedback(p.wikiFeedback)}</details>` : ''}
           <div class="dsh-filters">
             <div class="dsh-filter"><span class="ef-eyebrow">Execution</span>${ui.chips(EXEC.map((k) => ({ key: k, label: ui.label('exec', k), n: p.tasks.filter((t) => t.exec === k).length, on: ex.includes(k), glyph: icon(ui.ST.exec.items[k][1]) })), 'tk-exec', { label: '按执行状态' })}</div>
             ${p.live ? '' : html`<div class="dsh-filter"><span class="ef-eyebrow">Review</span>${ui.chips(REVIEW.map((k) => ({ key: k, label: ui.label('review', k), n: p.tasks.filter((t) => t.review === k).length, on: rv.includes(k), glyph: icon(ui.ST.review.items[k][1]) })), 'tk-review', { label: '按审查状态' })}</div>`}

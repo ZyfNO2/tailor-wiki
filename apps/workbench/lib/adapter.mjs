@@ -5,19 +5,18 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { readArtifacts, runCollection, runIdentity, runMetrics } from '../../../research-pack/research-intent.mjs';
-import { skillNames, skillHosts } from '../../../research-pack/install-independent.mjs';
-import { readWiki, stamp, shortCommit } from './wiki.mjs';
-import { parseTailor, parsePlan, parseDag, parseStory, execOf, idPattern } from './documents.mjs';
+import { readArtifacts, runCollection, runIdentity, runMetrics, skillNames, skillHosts } from './pack.mjs';
+import { DOCS } from './docs.mjs';
+import { readWiki, stamp, shortCommit, trackedSourcePaths } from './wiki.mjs';
+import { parseTailor, parsePlan, parseDag, parseStory, parseGuide, parseRetro, execOf, idPattern } from './documents.mjs';
+import { renderMarkdown } from './markdown.mjs';
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const message = error => String(error?.message ?? error);
-export const DOCS = [
-  { key: 'tailor', path: 'TAILOR.md', label: '学术裁缝方案', by: 'academic-tailor', view: 'schemes' },
-  { key: 'dag', path: 'RESEARCH-DAG.md', label: '研究任务 DAG', by: 'academic-tailor', view: 'dag' },
-  { key: 'plan', path: 'EXPERIMENT-PLAN.md', label: '实验计划', by: 'experiment-design', view: 'plan' },
-  { key: 'story', path: 'STORY-PLAN.md', label: '研究叙事', by: 'research-story', view: 'story' },
-];
+export { DOCS };
+// Experiment and story outputs flow back into the Wiki by default; the guide,
+// learner answers and the tailor/DAG files do not.
+const FEEDBACK_DOCS = ['plan', 'story'];
 const SKILL_LABEL = { 'wiki-maintain': 'Wiki 整理', 'academic-tailor': '学术裁缝', 'experiment-design': '实验设计', 'research-story': '研究叙事', 'research-guide': '研究导学' };
 
 /** Bounded, link-refusing UTF-8 read of one workspace-root file. */
@@ -60,14 +59,15 @@ export async function readWorkbench(workspacePath, opt = {}) {
   const root = fs.realpathSync(workspacePath);
   const now = new Date();
   const wiki = await readWiki(root, opt);
-  const docs = {}, parsed = {};
+  const docs = {}, parsed = {}, texts = {};
   const wikiPages = new Map((wiki.pages ?? []).map(p => [p.id, p.title])), pageExists = id => wikiPages.has(id), pageTitle = id => wikiPages.get(id);
   for (const d of DOCS) {
     const r = readDoc(root, d.path);
     docs[d.key] = { ...d, status: r.status, error: r.error ?? null, at: r.at ?? null, sha256: r.sha256 ?? null, mtime: r.mtime ?? null };
     if (r.status !== 'ok') continue;
+    texts[d.key] = r.text;
     try {
-      const fn = { tailor: parseTailor, dag: parseDag, plan: parsePlan, story: parseStory }[d.key];
+      const fn = { tailor: parseTailor, dag: parseDag, plan: parsePlan, story: parseStory, guide: parseGuide }[d.key];
       parsed[d.key] = fn(r.text, { pageExists, pageTitle });
       Object.assign(docs[d.key], { html: parsed[d.key].html, toc: parsed[d.key].toc, title: parsed[d.key].title, notes: parsed[d.key].notes ?? [] });
     } catch (error) { Object.assign(docs[d.key], { status: 'error', error: `解析失败：${message(error)}` }); }
@@ -75,7 +75,8 @@ export async function readWorkbench(workspacePath, opt = {}) {
 
   // Extra paths (run / review / metrics records) through the Skill pack's own
   // read adapter; each path is isolated so one bad file never hides the rest.
-  const extra = { files: [], errors: [], unavailable: [], skipped: [] }, runs = [];
+  const extra = { files: [], errors: [], unavailable: [], skipped: [] }, runs = [], reports = [];
+  let practice = null;
   const docPaths = new Set(DOCS.map(d => d.path));
   for (const rel of opt.paths ?? []) {
     try {
@@ -85,12 +86,21 @@ export async function readWorkbench(workspacePath, opt = {}) {
       for (const a of projection.artifacts.filter(a => !docPaths.has(a.path))) {
         if (extra.files.some(f => f.path === a.path)) continue;
         extra.files.push({ path: a.path, type: a.type, sha256: a.sha256, domainIds: a.domainIds });
+        // Learner answers are shown only when the user names them in --paths.
+        if (/^RESEARCH-PRACTICE/i.test(path.basename(a.path)) && /\.md$/i.test(a.path)) { practice = { path: a.path, html: renderMarkdown(a.content, { idPrefix: 'pr' }).html }; continue; }
+        if (/\.(?:md|markdown)$/i.test(a.path)) reports.push({ path: a.path, text: a.content });
         if (a.data !== undefined && (a.type === 'run-or-evidence-record' || a.domainIds.runId)) runs.push(...runsOf(a));
       }
     } catch (error) { extra.errors.push(`${rel}：${message(error)}`); }
   }
 
-  const tailor = parsed.tailor, dag = parsed.dag, plan = parsed.plan, story = parsed.story;
+  const tailor = parsed.tailor, dag = parsed.dag, plan = parsed.plan, story = parsed.story, guide = parsed.guide;
+  // Retrospectives / progress reviews: sections in the plan or in result
+  // reports passed with --paths. Read as written; none is synthesised.
+  const retroSources = [...(texts.plan ? [{ path: 'EXPERIMENT-PLAN.md', text: texts.plan }] : []), ...reports.sort((a, b) => a.path.localeCompare(b.path))];
+  const retroParsed = retroSources.map(r => { try { return parseRetro(r.text, r.path); } catch { return { retros: [], progress: null }; } });
+  // Several progress reviews: the latest check time wins, then the last file name (date-named reports).
+  const retros = retroParsed.flatMap(r => r.retros), progressReview = retroParsed.map(r => r.progress).filter(Boolean).sort((a, b) => String(b.checkedAt ?? '').localeCompare(String(a.checkedAt ?? '')) || b.file.localeCompare(a.file))[0] ?? null;
   const schemes = tailor?.schemes ?? [], tasks = dag?.tasks ?? [], plans = plan?.plans ?? [];
   schemes.forEach(s => { s.source.at = docs.tailor.at; });
   const pageIds = new Set((wiki.pages ?? []).map(p => p.id));
@@ -110,6 +120,10 @@ export async function readWorkbench(workspacePath, opt = {}) {
     c.refs = [...schemes.filter(s => has(text, s.id)).map(s => 'scheme:' + s.id), ...plans.filter(p => has(text, p.id)).map(p => 'plan:' + p.id), ...[...runIds].filter(id => has(text, id)).map(id => 'run:' + id), ...[...pageIds].filter(id => has(text, id)).map(id => 'wiki:' + id)];
   }
   for (const s of schemes) s.contribs = (story?.contributions ?? []).filter(c => c.refs.includes('scheme:' + s.id)).map(c => c.id);
+  for (const row of tailor?.alignment?.rows ?? []) {
+    const text = `${row.goal ?? ''} ${row.basis ?? ''} ${row.gap ?? ''} ${row.next ?? ''}`;
+    row.refs = [...schemes.filter(s => has(text, s.id)).map(s => 'scheme:' + s.id), ...plans.filter(p => has(text, p.id)).map(p => 'plan:' + p.id), ...[...pageIds].filter(id => has(text, id)).map(id => 'wiki:' + id)];
+  }
 
   const taskIds = new Set(tasks.map(t => t.id));
   const missing = new Map();
@@ -144,7 +158,8 @@ export async function readWorkbench(workspacePath, opt = {}) {
         : d.key === 'tailor' ? `${schemes.length} 个方案${p.wholeFile ? '（全文作为一个方案）' : ''}`
           : d.key === 'dag' ? `${tasks.length} 个任务 │ ${dagEdges.length} 条依赖`
             : d.key === 'plan' ? `${plans.length} 个实验计划`
-              : `${story.contributions.length} 项贡献 │ ${story.gaps.length} 个补证事项`;
+              : d.key === 'guide' ? `${guide.route.length} 步阅读路线 │ ${guide.questions.length} 道待答题`
+                : `${story.contributions.length} 项贡献 │ ${story.gaps.length} 个补证事项`;
       const notes = [doc.error, ...(doc.notes ?? [])].filter(Boolean);
       return { key: d.key, path: d.path, label: d.label, by: d.by, at: doc.at ?? '—', detail: doc.sha256 ? `${detail} │ sha256 ${doc.sha256.slice(0, 8)}` : detail,
         status: doc.status === 'ok' && doc.notes?.length ? 'partial' : doc.status, note: notes.join(' ') || null };
@@ -163,11 +178,12 @@ export async function readWorkbench(workspacePath, opt = {}) {
     'academic-tailor': docs.tailor.status === 'ok' ? `${schemes.length} 个方案${docs.dag.status === 'ok' ? ` │ DAG ${tasks.length} 个任务` : ''}` : null,
     'experiment-design': docs.plan.status === 'ok' ? `${plans.length} 个实验计划` : null,
     'research-story': docs.story.status === 'ok' ? `${story.contributions.length} 项贡献 │ ${story.gaps.length} 个补证事项` : null,
+    'research-guide': docs.guide.status === 'ok' ? `${guide.route.length} 步阅读路线 │ ${guide.questions.length} 道待答题` : null,
   };
   const latestTrace = Object.entries(wiki.traces ?? {}).sort((a, b) => String(b[1].sortAt).localeCompare(String(a[1].sortAt)))[0]?.[0] ?? null;
   const skills = skillNames.map(name => ({
     id: name, name: SKILL_LABEL[name], file: { 'wiki-maintain': 'wiki/', 'academic-tailor': 'TAILOR.md', 'experiment-design': 'EXPERIMENT-PLAN.md', 'research-story': 'STORY-PLAN.md', 'research-guide': 'RESEARCH-GUIDE.md' }[name],
-    output: skillOut[name] ?? null, at: name === 'wiki-maintain' ? wiki.snapshot?.at ?? null : docs[{ 'academic-tailor': 'tailor', 'experiment-design': 'plan', 'research-story': 'story' }[name]]?.at ?? null,
+    output: skillOut[name] ?? null, at: name === 'wiki-maintain' ? wiki.snapshot?.at ?? null : docs[{ 'academic-tailor': 'tailor', 'experiment-design': 'plan', 'research-story': 'story', 'research-guide': 'guide' }[name]]?.at ?? null,
     trace: name === 'wiki-maintain' ? latestTrace : null, installed: installs[name],
   }));
 
@@ -180,6 +196,29 @@ export async function readWorkbench(workspacePath, opt = {}) {
     ...DOCS.filter(d => docs[d.key].status === 'ok').map(d => ({ path: d.path, by: d.by, at: docs[d.key].at, ref: 'view:' + d.view, sort: new Date(docs[d.key].mtime).toISOString() })),
   ].sort((a, b) => String(b.sort).localeCompare(String(a.sort))).map(({ sort, ...r }) => r);
 
+  // Wiki feedback of experiment/story outputs, by content hash: the Wiki holds
+  // the current file, an older version, or nothing; pending syncs as recorded.
+  const wikiSources = (wiki.sources ?? []).filter(s => !s.inventoryOnly);
+  const wikiFeedback = FEEDBACK_DOCS.filter(k => docs[k].status === 'ok').map(k => {
+    const d = docs[k], source = wikiSources.find(s => s.path === d.path), pending = (wiki.pendingFeedback ?? []).find(f => (f.artifacts ?? []).some(a => a.path === d.path));
+    const status = pending ? 'pending' : !wiki.commitId ? 'no-wiki' : !source ? 'not-synced' : source.sha256 === d.sha256 ? 'synced' : 'outdated';
+    return { key: k, path: d.path, status, error: pending?.error ?? null, revision: source?.revision ?? null };
+  });
+  // Progress summary from the actual files: delivered / blocked / to verify /
+  // next. "Next" is the Skill's own progress review when one exists; otherwise
+  // it is derived from explicit DAG states and story gaps and says so.
+  const doneTasks = new Set(tasks.filter(t => t.exec === 'done').map(t => t.id));
+  const ready = tasks.filter(t => t.exec === 'pending' && dagEdges.filter(e => e.to === t.id).every(e => doneTasks.has(e.from)));
+  const progress = {
+    delivered: [...(wiki.commitId ? [{ text: `Wiki 快照 #${shortCommit(wiki.commitId)}（${wiki.pages.length} 页）`, at: wiki.snapshot.at, ref: 'view:read' }] : []), ...DOCS.filter(d => docs[d.key].status === 'ok').map(d => ({ text: d.path, at: docs[d.key].at, ref: 'view:' + d.view })), ...tasks.filter(t => t.exec === 'done').map(t => ({ text: `${t.id} ${t.title}`, ref: 'task:' + t.id }))],
+    blocked: [...tasks.filter(t => ['blocked', 'failed'].includes(t.exec)).map(t => ({ text: `${t.id} ${t.title}`, why: t.blocked || t.statusText, ref: 'task:' + t.id })), ...plans.filter(p => ['blocked', 'failed'].includes(p.exec)).map(p => ({ text: `${p.id} ${p.title}`, why: p.statusText, ref: 'plan:' + p.id }))],
+    pending: [...(story?.contributions ?? []).filter(c => !['supported', 'refuted'].includes(c.state)).map(c => ({ text: `${c.id} ${c.text}`, why: c.statusText, ref: 'contrib:' + c.id })), ...plans.filter(p => ['pending', 'unknown'].includes(p.exec)).map(p => ({ text: `${p.id} ${p.title}`, why: p.statusText ?? '状态未填写', ref: 'plan:' + p.id }))],
+    next: progressReview?.groups.next.length
+      ? progressReview.groups.next.map(x => ({ text: x.text, why: x.evidence, from: progressReview.file }))
+      : [...ready.map(t => ({ text: `${t.id} ${t.title}`, why: '前置任务均已完成（按 DAG 状态列）', ref: 'task:' + t.id, from: 'RESEARCH-DAG.md' })), ...(story?.gaps ?? []).map(g => ({ text: g.text, why: g.next, from: 'STORY-PLAN.md' }))],
+    review: progressReview ? { file: progressReview.file, checkedAt: progressReview.checkedAt, line: progressReview.line } : null,
+  };
+
   const name = path.basename(root) || root;
   const empty = !wiki.commitId && DOCS.every(d => docs[d.key].status === 'missing') && !runs.length;
   return {
@@ -191,9 +230,11 @@ export async function readWorkbench(workspacePath, opt = {}) {
     graph: { nodes: graphNodes, edges: graphEdges }, schemes, hypotheses: [], planFile: docs.plan.status === 'ok' ? { path: 'EXPERIMENT-PLAN.md', version: 'sha256 ' + docs.plan.sha256.slice(0, 8), at: docs.plan.at, change: null } : null,
     plans, runs, reviews: [], conclusions: [], tasks, artifacts: {}, dagEdges, dagCycleEdge: null, dagMissing: [...missing.values()], dagClaimLinks: claimLinks, dagWarnings: dag?.warnings ?? [],
     members: [], roleTemplates: [], conflicts: [], traces: wiki.traces ?? {},
-    story: docs.story.status === 'ok' ? { file: 'STORY-PLAN.md', version: 'sha256 ' + docs.story.sha256.slice(0, 8), at: docs.story.at, by: 'research-story', thread: story.thread, structure: [], claims: [], contributions: story.contributions, figures: story.figures, storylines: [], choice: null, gaps: story.gaps, gapsStatus: story.gapsStatus, gapsHtml: story.gapsHtml, weak: story.weak, weakStatus: story.weakStatus, weakHtml: story.weakHtml, live: true } : null,
+    story: docs.story.status === 'ok' ? { file: 'STORY-PLAN.md', version: 'sha256 ' + docs.story.sha256.slice(0, 8), at: docs.story.at, by: 'research-story', thread: story.thread, opening: story.opening, formats: story.formats, structure: [], claims: [], contributions: story.contributions, figures: story.figures, storylines: [], choice: null, gaps: story.gaps, gapsStatus: story.gapsStatus, gapsHtml: story.gapsHtml, weak: story.weak, weakStatus: story.weakStatus, weakHtml: story.weakHtml, live: true } : null,
     changes, recent, docs: Object.fromEntries(Object.entries(docs).map(([k, d]) => [k, { path: d.path, status: d.status, error: d.error, at: d.at, sha256: d.sha256, html: d.html ?? null, toc: d.toc ?? [], title: d.title ?? null, notes: d.notes ?? [] }])),
-    schemeTables: tailor ? { check: tailor.checkTable, module: tailor.moduleTable, decisionText: tailor.decisionText } : null,
+    schemeTables: tailor ? { check: tailor.checkTable, module: tailor.moduleTable, decisionText: tailor.decisionText, alignment: tailor.alignment } : null,
+    guide: docs.guide.status === 'ok' ? { file: 'RESEARCH-GUIDE.md', at: docs.guide.at, version: 'sha256 ' + docs.guide.sha256.slice(0, 8), title: guide.title, goal: guide.goal, scope: guide.scope, route: guide.route, routeStatus: guide.routeStatus, routeHtml: guide.routeHtml, questions: guide.questions, questionsStatus: guide.questionsStatus, questionsHtml: guide.questionsHtml, practice } : null,
+    retros, progressReview, progress, wikiFeedback, drift: wiki.drift ?? null,
     wikiState: { journals: (wiki.journals ?? []).map(j => ({ commit: shortCommit(j.commitId), runId: j.runId })), pendingFeedback: (wiki.pendingFeedback ?? []).map(f => ({ runId: f.runId, status: f.status, paths: (f.artifacts ?? []).map(a => a.path), error: f.error })), completion: wiki.completion ?? null, semanticReview: wiki.semanticReview?.status ?? null, warnings: wiki.warnings ?? [] },
     extraFiles: extra.files,
   };
@@ -205,8 +246,15 @@ export function fingerprint(workspacePath, opt = {}) {
   const add = rel => { try { const st = fs.statSync(path.join(root, rel)); parts.push(`${rel}:${st.size}:${st.mtimeMs}`); } catch { parts.push(`${rel}:-`); } };
   ['.wiki/current.json', ...DOCS.map(d => d.path)].forEach(add);
   for (const dir of ['.wiki/journals', '.wiki/runs']) {
-    try { for (const name of fs.readdirSync(path.join(root, dir)).sort()) { add(`${dir}/${name}`); if (dir === '.wiki/runs') add(`${dir}/${name}/events`); } } catch { parts.push(`${dir}:-`); }
+    try {
+      for (const name of fs.readdirSync(path.join(root, dir)).sort()) {
+        add(`${dir}/${name}`);
+        if (dir === '.wiki/runs') { add(`${dir}/${name}/events`); try { parts.push(`${dir}/${name}/events#${fs.readdirSync(path.join(root, dir, name, 'events')).length}`); } catch { /* no events yet */ } }
+      }
+    } catch { parts.push(`${dir}:-`); }
   }
+  // Originals of registered sources: a change after the snapshot must show.
+  for (const rel of trackedSourcePaths(root)) add(rel);
   for (const rel of opt.paths ?? []) {
     const visit = (r, depth) => {
       add(r);

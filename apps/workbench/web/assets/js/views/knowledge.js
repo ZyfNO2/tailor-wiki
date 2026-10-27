@@ -728,7 +728,8 @@
         Object.values(db.cites).forEach((c) => (cnt[c.source] = (cnt[c.source] || 0) + 1));
         const fs = DSH.vs('kb-src', { q: '', kind: 'all' });
         const q = fs.q.trim().toLowerCase();
-        const inKind = (s) => fs.kind === 'registered' ? !s.inventoryOnly : fs.kind === 'excluded' ? s.inventoryOnly && s.status === 'excluded' : fs.kind === 'other' ? s.inventoryOnly && s.status !== 'excluded' : true;
+        const inKind = (s) => fs.kind === 'registered' ? !s.inventoryOnly : fs.kind === 'excluded' ? s.inventoryOnly && s.status === 'excluded' : fs.kind === 'other' ? s.inventoryOnly && s.status !== 'excluded' : fs.kind === 'drift' ? !!s.drift : true;
+        const driftN = p.sources.filter((s) => s.drift).length;
         const rows = p.sources.filter((s) => inKind(s) && (!q || (s.id + ' ' + s.path + ' ' + s.kind).toLowerCase().includes(q)));
         return html`
           ${head}
@@ -740,12 +741,13 @@
               { key: 'registered', label: '登记来源', n: p.counts.registered, on: fs.kind === 'registered' },
               { key: 'excluded', label: '明确排除', n: p.sources.filter((s) => s.inventoryOnly && s.status === 'excluded').length, on: fs.kind === 'excluded' },
               { key: 'other', label: '未登记（不支持 / 不可用）', n: p.sources.filter((s) => s.inventoryOnly && s.status !== 'excluded').length, on: fs.kind === 'other' },
-            ], 'src-kind', { label: '按口径筛选' })}</div>` : ''}
+            ].concat(driftN ? [{ key: 'drift', label: '原件在快照后变化', n: driftN, on: fs.kind === 'drift' }] : []), 'src-kind', { label: '按口径筛选' })}</div>` : ''}
+            ${driftN ? ui.notice('需要维护', html`<p>${driftN} 个登记来源的原件在 Wiki 快照之后变化或不见了（按内容哈希比对）。Wiki 仍是旧版本，需要由 wiki-maintain 增量维护；工作台不替你更新。</p>`) : ''}
             <div class="dsh-toolbar">${ui.search('搜索路径、编号、性质', 'src-q', fs.q)}</div>
             <div class="ef-table-wrap">
               <table class="ef-table">
                 <thead><tr><th>文件</th><th>性质</th><th>日期</th><th class="num">被引用</th><th>覆盖状态</th><th></th></tr></thead>
-                <tbody>${rows.map((s) => html`<tr id="src-row-${s.id}"><td>${ui.path(s.path, { copy: s.status !== 'missing' })}</td><td>${s.kind}</td><td class="ef-field">${s.year}</td><td class="num">${cnt[s.id] || 0}</td><td>${ui.st('cov', s.status)}</td><td>${ui.btn('预览', { act: 'open', data: { ref: 'source:' + s.id } })}</td></tr>`)}</tbody>
+                <tbody>${rows.map((s) => html`<tr id="src-row-${s.id}"><td>${ui.path(s.path, { copy: s.status !== 'missing' })}</td><td>${s.kind}</td><td class="ef-field">${s.year}</td><td class="num">${cnt[s.id] || 0}</td><td>${ui.st('cov', s.status)}${s.drift ? html`<div>${ui.st('drift', s.drift)}</div>` : ''}</td><td>${ui.btn('预览', { act: 'open', data: { ref: 'source:' + s.id } })}</td></tr>`)}</tbody>
               </table>
             </div>
             ${rows.length ? '' : html`<p class="ef-empty">没有匹配“${fs.q}”的来源。</p>`}

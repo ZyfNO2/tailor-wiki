@@ -68,6 +68,20 @@
     aspect: { dim: '方面', items: {
       observation: ['问题观察', 'g-pv-current', 'solid'], performance: ['性能收益', 'g-ck-pass', 'solid'],
       mechanism: ['机制解释', 'g-vd-pending', 'dash'], novelty: ['文献新颖性', 'g-q', 'dash'] } },
+    gap: { dim: '缺口', items: {
+      expression: ['表达缺口', 'g-q', 'dash'], evidence: ['证据缺口', 'g-vd-insufficient', 'alert'],
+      experiment: ['实验缺口', 'g-pending', 'alert'], method: ['方法 / 能力缺口', 'g-blocked', 'alert'],
+      supported: ['已有支持', 'g-vd-supported', 'solid'], pending: ['待确认', 'g-vd-pending', 'dash mute'], unknown: ['未分类', 'g-unknown', 'dash mute'] } },
+    sync: { dim: 'Wiki 回流', items: {
+      synced: ['已回流', 'g-done', 'ink'], outdated: ['文件已更新 │ 待回流', 'g-fr-stale', 'alert'],
+      'not-synced': ['未回流', 'g-pending', 'dash'], pending: ['等待合并', 'g-fr-stale', 'alert'],
+      failed: ['上次同步失败', 'g-failed', 'alert'], 'no-wiki': ['无 Wiki 快照', 'g-fr-missing', 'dash mute'] } },
+    drift: { dim: '原件', items: {
+      changed: ['快照后已变化 │ 待维护', 'g-fr-stale', 'alert'], missing: ['原件不见了', 'g-unlink', 'alert'],
+      unreadable: ['无法核对', 'g-unknown', 'dash mute'] } },
+    link: { dim: '连接', items: {
+      ok: ['已连接', 'g-fr-ok', 'solid'], checking: ['检查中', 'g-pending', 'dash'],
+      offline: ['服务失联', 'g-fr-error', 'alert'], stale: ['可能陈旧', 'g-fr-stale', 'alert'], moved: ['工作区已变', 'g-zap', 'alert'] } },
   };
   ui.ST = ST;
   ui.label = (dim, key) => ((ST[dim] && ST[dim].items[key]) || [key])[0];
@@ -227,4 +241,31 @@
   };
   ui.time = (t) => html`<time class="ef-field">${t}</time>`;
   ui.provNote = (run) => (run.prov === 'historical' ? '历史报告：不是本轮实验' : run.prov === 'simulated' ? '模拟：不参与判定' : '');
+
+  /* ---------- 7. 研究进度：已交付 / 受阻 / 待验证 / 下一步，加 Wiki 回流 ----------
+     条目全部来自文件；“下一步”优先取 Skill 写下的进度回顾，没有时按 DAG 状态列
+     与补证事项列出并注明出处。工作台不排期、不派发，也不把计划写成已完成。 */
+  const LANES = [
+    ['delivered', 'Delivered', '已交付', '还没有读到产物。'],
+    ['blocked', 'Blocked', '受阻', '文件里没有受阻或失败的任务与计划。'],
+    ['pending', 'To verify', '待验证', '没有待验证的主张或未执行的计划。'],
+    ['next', 'Next', '下一步', '文件里没有写下一步，也没有前置已满足的任务。'],
+  ];
+  ui.progress = (pg, opt = {}) => {
+    if (!pg) return '';
+    const max = opt.max || 5;
+    const item = (x) => html`<li><span class="ef-read">${x.text}${x.ref ? html` ${ui.ref(x.ref, { idOnly: true })}` : ''}</span>${x.why ? html`<span class="dsh-note">${x.why}</span>` : ''}${x.from || x.at ? html`<span class="ef-field">${[x.from ? '来自 ' + x.from : '', x.at || ''].filter(Boolean).join(' │ ')}</span>` : ''}</li>`;
+    return html`<div class="dsh-lanes dsh-progress">${LANES.map(([k, en, zh, none]) => {
+      const items = pg[k] || [];
+      return html`<section class="dsh-lane is-${k}">
+        <h3>${ui.pair(en, zh)} <span class="ef-field">${items.length}</span></h3>
+        ${items.length ? html`<ul>${items.slice(0, max).map(item)}</ul>${items.length > max ? html`<p class="dsh-note">另有 ${items.length - max} 项未列出。</p>` : ''}` : html`<p class="ef-empty">${none}</p>`}
+      </section>`;
+    })}</div>
+    <p class="dsh-note">${pg.review ? html`“下一步”取自 ${pg.review.file} 的进度回顾${pg.review.checkedAt ? '（' + pg.review.checkedAt + '）' : ''}。` : '没有进度回顾小节：“下一步”按 RESEARCH-DAG.md 的状态列（前置都已完成的待执行任务）与 STORY-PLAN.md 的补证事项列出。'}已运行不等于主张已支持；历史与模拟记录不算本轮结果。</p>`;
+  };
+  /* Wiki 回流：实验与叙事文件默认增量回流 Wiki。按内容哈希比对 Wiki 登记的版本 */
+  ui.feedback = (rows) => (rows && rows.length
+    ? html`<ul class="ef-ledger">${rows.map((f) => html`<li><span>${ui.path(f.path, { copy: false })}</span><span>${ui.st('sync', f.status === 'pending' && f.error ? 'failed' : f.status)}${f.error ? html` <span class="ef-field">${f.error}</span>` : ''}</span></li>`)}</ul>`
+    : html`<p class="ef-empty">没有需要回流 Wiki 的实验计划或叙事文件。</p>`);
 })();

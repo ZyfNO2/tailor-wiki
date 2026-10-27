@@ -24,7 +24,7 @@
             <thead><tr><th>内容</th><th>文件</th><th>由谁提供</th><th>读取</th></tr></thead>
             <tbody>${p.files.map((f) => html`<tr><td>${f.label}</td><td>${ui.path(f.path)}</td><td>${f.by}</td><td>${ui.st('fresh', f.status)}</td></tr>`)}</tbody>
           </table>
-          <p class="dsh-note">四个 Skill 各自独立运行，没有总 Skill，也不需要按顺序运行：wiki-maintain、academic-tailor、experiment-design、research-story。</p>
+          <p class="dsh-note">五个 Skill 各自独立运行，没有总 Skill，也不需要按顺序运行：wiki-maintain、academic-tailor、experiment-design、research-story、research-guide。</p>
         </section>
       </div>`;
   }
@@ -65,6 +65,7 @@
         { zh: 'DAG', en: 'Dependencies', href: '#/dag', big: p.dagEdges.length, unit: '条依赖', sub: `缺失节点 ${p.dagMissing.length}`, alert: p.dagMissing.length > 0 },
         { zh: '任务', en: 'Tasks', href: '#/tasks/list', big: total, unit: '项', sub: `阻塞 ${exec.blocked || 0} │ 失败 ${exec.failed || 0}`, alert: blockedN > 0 },
         { zh: '叙事', en: 'Story', href: '#/story', big: story ? story.contributions.length : 0, unit: '项贡献', sub: story ? `补证事项 ${story.gaps.length}` : '没有 STORY-PLAN.md' },
+        { zh: '导学', en: 'Guide', href: '#/guide', big: p.guide ? p.guide.route.length : 0, unit: '步路线', sub: p.guide ? `待答题 ${p.guide.questions.length}` : '没有 RESEARCH-GUIDE.md' },
       ],
     };
     const attn = [
@@ -72,6 +73,8 @@
       ...(st.unprocessed.length ? [{ t: html`${st.unprocessed.length} 个来源没有完整处理 ${ui.st('cov', 'partial', { text: '部分 ' + (st.coverage.partial || 0) })} ${ui.st('cov', 'failed', { text: '失败 / 不支持 ' + (st.coverage.failed || 0) })}`, m: st.unprocessed.map((s) => s.path.split('/').pop()).join('、'), b: ui.btn('查看覆盖', { act: 'go', data: { href: DSH.href('/knowledge/coverage', { status: 'partial,failed' }) } }) }] : []),
       ...(ws.journals || []).map((j) => ({ t: html`Wiki 有未完成的写入 #${j.commit} ${ui.st('fresh', 'error', { text: '需要恢复' })}`, m: '由 wiki-maintain 运行 recover 处理；工作台不替你恢复。', b: '' })),
       ...(ws.pendingFeedback || []).map((f) => ({ t: html`待同步到 Wiki 的产物 ${ui.st('fresh', 'stale', { text: f.status === 'failed-awaiting-agent' ? '上次同步失败' : '等待合并' })}`, m: f.paths.join('、') + (f.error ? '；' + f.error : ''), b: '' })),
+      ...(p.drift && p.drift.changed.length + p.drift.missing.length ? [{ t: html`${p.drift.changed.length + p.drift.missing.length} 个来源原件在 Wiki 快照后变化 ${ui.st('drift', p.drift.changed.length ? 'changed' : 'missing')}`, m: '按内容哈希比对；需要由 wiki-maintain 增量维护，工作台不替你更新。', b: ui.btn('查看来源', { act: 'go', data: { href: '#/knowledge/sources' } }) }] : []),
+      ...(p.wikiFeedback || []).filter((f) => f.status === 'outdated').map((f) => ({ t: html`${f.path} 在回流后又更新了 ${ui.st('sync', 'outdated')}`, m: 'Wiki 里是旧版本；实验与叙事产物默认增量回流 Wiki，由 wiki-maintain 的 feedback 处理。', b: '' })),
       ...st.blocked.map((t) => ({ t: html`${t.id} ${t.title} ${ui.st('exec', t.exec)}`, m: t.blocked || t.statusText || '', b: ui.btn('详情', { act: 'open', data: { ref: 'task:' + t.id } }) })),
       ...(st.issuesOpen.length ? [{ t: html`${st.issuesOpen.length} 个问题尚未解决 ${ui.st('issue', 'open', { text: '未解决 ' + st.issuesOpen.filter((q) => q.status === 'open').length })}`, m: st.issuesOpen.map((q) => q.id + ' ' + q.title).join('；'), b: ui.btn('问题列表', { act: 'go', data: { href: '#/knowledge/issues' } }) }] : []),
       ...(p.dagMissing.length ? [{ t: html`DAG 引用了 ${p.dagMissing.length} 个节点表中没有的任务 ${ui.st('edge', 'missing')}`, m: p.dagMissing.map((m) => m.id).join('、'), b: ui.btn('DAG 白板', { act: 'go', data: { href: '#/dag' } }) }] : []),
@@ -88,7 +91,7 @@
         </header>
         <div class="board">
           <div class="orbit">
-            <figure class="hub"><svg class="ef-dial" data-dial role="group" aria-label="研究链路：七个分区"></svg></figure>
+            <figure class="hub"><svg class="ef-dial" data-dial role="group" aria-label="研究链路：八个分区"></svg></figure>
             <section class="ef-panel cut-br l1">
               <h2>${ui.pair('Knowledge', '知识库')} <a href="#/knowledge/read">阅读</a></h2>
               <div class="ef-figs">
@@ -137,6 +140,13 @@
               <h2>${ui.pair('Needs attention', '需要处理')} <small>只列文件里实际记录的问题</small></h2>
               ${attn.length ? html`<ul class="ef-rows">${attn.map((a) => html`<li><div><div>${a.t}</div>${a.m ? html`<div class="meta"><span>${a.m}</span></div>` : ''}</div>${a.b ? html`<div class="acts">${a.b}</div>` : ''}</li>`)}</ul>` : html`<p class="ef-empty">读取的文件里没有需要处理的事项。</p>`}
             </section>
+            <section class="ef-panel" id="ov-status">
+              <h2>${ui.pair('Progress', '研究进度')} <small>已交付 │ 受阻 │ 待验证 │ 下一步</small></h2>
+              ${ui.progress(p.progress)}
+              ${p.progressReview ? html`<details class="dsh-docbox"><summary>${icon('file')}进度回顾原文 │ ${p.progressReview.file} 第 ${p.progressReview.line} 行</summary>${ui.md(p.progressReview.html)}</details>` : ''}
+              <h3 class="dsh-h3">${ui.pair('Wiki feedback', 'Wiki 回流')}</h3>
+              ${ui.feedback(p.wikiFeedback)}
+            </section>
             <section class="ef-panel" id="ov-progress">
               <h2>${ui.pair('Task counts', '任务进度')} <small>RESEARCH-DAG.md │ ${total} 项任务</small></h2>
               ${total ? DSH.charts.stack({
@@ -164,7 +174,7 @@
               ${p.recent.length ? html`<ul class="ef-rows">${p.recent.map((a) => html`<li><div><div>${ui.path(a.path, { copy: false })}</div><div class="meta"><span>${a.by}</span><span>${a.at}</span></div></div><div class="acts">${ui.btn('打开', { act: 'open', data: { ref: a.ref } })}</div></li>`)}</ul>` : html`<p class="ef-empty">还没有产物。</p>`}
             </section>
             <section class="ef-panel" id="ov-skills">
-              <h2>${ui.pair('Skills', '四个独立 Skill')} <small>没有总 Skill │ 不要求顺序 │ 与工作台互不依赖</small></h2>
+              <h2>${ui.pair('Skills', `${p.skills.length} 个独立 Skill`)} <small>没有总 Skill │ 不要求顺序 │ 与工作台互不依赖</small></h2>
               <ul class="ef-rows">
                 ${p.skills.map((s) => html`<li><div><div><b>${s.name}</b> <code class="dsh-code-inline">${s.id}</code></div><div class="meta"><span>${s.file}</span><span>${s.output || '尚无产物'}</span><span>${s.at || '—'}</span><span>${s.installed && s.installed.length ? '已安装到 ' + s.installed.join('、') : '未安装到此工作区'}</span></div></div><div class="acts">${s.trace ? ui.btn('trace', { act: 'open', data: { ref: 'trace:' + s.trace } }) : html`<span class="ef-field">无 trace</span>`}</div></li>`)}
               </ul>

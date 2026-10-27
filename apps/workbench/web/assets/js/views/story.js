@@ -18,6 +18,31 @@
     ['alternative', '备选解释', '同样能解释结果、需要排除的说法'],
   ];
   const ASPECTS = [['observation', '问题观察'], ['performance', '性能收益'], ['mechanism', '机制解释'], ['novelty', '文献新颖性']];
+  const OPENING = [['why', 'Why', '为什么做'], ['problem', 'Problem', '遇到什么问题'], ['approach', 'Approach', '怎样解决'], ['evidence', 'Evidence', '数据支持什么']];
+
+  /* 默认短故事：标题与第一节之间的段落。写成“为什么做：… / 遇到什么问题：…”时按四步列出，
+     否则按原文显示；缺的一步写“文件中没有写”，不补写。 */
+  function opening(s) {
+    const o = s.opening;
+    if (!o) return html`<p class="dsh-note">文件开头没有短故事段落（为什么做 → 遇到什么问题 → 怎样解决 → 数据支持什么）。</p>`;
+    return html`
+      ${o.parts ? html`<ol class="dsh-argue">${OPENING.map(([k, en, zh], i) => {
+        const part = o.parts.find((x) => x.key === k);
+        return html`<li class="is-${part ? 'observed' : 'unknown'}">
+          <p class="dsh-argue-h"><b class="ef-field">${DSH.fmt.pad(i + 1)}</b><span class="ef-pair"><span class="ef-eyebrow">${en}</span><span>${zh}</span></span></p>
+          ${part ? html`<p class="ef-read">${part.text}</p>` : html`<p class="muted">文件中没有写这一步。</p>`}
+        </li>`;
+      })}</ol>` : ui.md(o.html)}
+      ${o.statusLine ? html`<p class="dsh-chiprow"><span class="ef-eyebrow">Evidence status</span><span class="ef-read">证据状态：${o.statusLine}</span></p>` : ''}
+      <p class="dsh-note">短故事是文件开头的原文${o.parts ? '，按“为什么做：”等标签分成四步' : ''}；“数据支持什么”以贡献—证据表的支持状态为准。</p>`;
+  }
+  function formats(s) {
+    if (!(s.formats || []).length) return '';
+    return html`
+      <h2 class="dsh-h2">${ui.pair('Other forms', '已写好的其他表达')}</h2>
+      <p class="dsh-note">只显示文件里已有的组会汇报提纲或开题摘要；工作台不生成。</p>
+      ${s.formats.map((f) => html`<details class="dsh-docbox" id="fmt-${f.line}"><summary>${icon('file')}${f.label} │ ${f.title} <span class="ef-field">STORY-PLAN.md 第 ${f.line} 行</span></summary>${ui.md(f.html)}</details>`)}`;
+  }
 
   /* ---------- 实时模式：STORY-PLAN.md 的主线、贡献—证据表、图表安排与补证事项 ---------- */
   function liveStory(p, s, banner) {
@@ -36,6 +61,9 @@
             ${s.thread ? html`<blockquote class="ef-read">${s.thread}</blockquote>` : html`<p class="muted">文件中没有写出一句话主线。</p>`}
             <figcaption class="dsh-note">叙事是写作规划，不是性能或机制成立的独立证据。</figcaption>
           </figure>
+
+          <h2 class="dsh-h2">${ui.pair('Short story', '为什么做 → 遇到什么问题 → 怎样解决 → 数据支持什么')}</h2>
+          ${opening(s)}
 
           <h2 class="dsh-h2">${ui.pair('Contributions × evidence', '贡献—证据表')}</h2>
           ${s.contributions.length ? html`
@@ -59,6 +87,8 @@
           <p class="dsh-note">只列计划：没有做出来的图不画成成品。</p>
           <ol class="dsh-ul ef-read">${s.figures.map((f) => html`<li id="fig-${f.id}"><b>${f.title}</b>${f.question ? html` │ 拟回答：${f.question}` : ''}${f.materials ? html` │ 素材：${f.materials}` : ''}${f.statusText ? html` <span class="ef-field">${f.statusText}</span>` : ''}</li>`)}</ol>` : ''}
 
+          ${formats(s)}
+
           ${s.weak && s.weak.length ? html`
           <h2 class="dsh-h2">${ui.pair('Avoid', '目前不宜使用的强表述')}</h2>
           <ul class="dsh-ul ef-read">${s.weak.map((w) => html`<li>${w}</li>`)}</ul>` : s.weakStatus === 'unparsed' ? html`
@@ -75,7 +105,7 @@
           <p class="ef-actions">${ui.btn('跳到实验计划', { act: 'go', data: { href: '#/experiments/plan' } })}</p>
           <h2 class="dsh-margin-h">${ui.pair('Boundary', '边界')}</h2>
           <p class="dsh-note">这一页只展示 STORY-PLAN.md，不生成或修改论文正文。</p>
-          ${ui.ledger([['文件', ui.path(s.file)], ['版本', s.version], ['更新', s.at]])}
+          ${ui.ledger([['文件', ui.path(s.file)], ['版本', s.version], ['更新', s.at], ['其他表达', (s.formats || []).length ? s.formats.map((f) => f.label).join('、') : '文件中没有']])}
         </aside>
       </div>`;
   }

@@ -13,6 +13,7 @@
     "test:reader": "npm --prefix apps/wiki-reader test",
     "test:workbench": "node --test apps/workbench/tests/*.spec.mjs",
     "workbench": "node apps/workbench/server.mjs",
+    "workbench:open": "node apps/workbench/open.mjs",
     "build:reader": "npm --prefix apps/wiki-reader run build"
   },
   "dependencies": {

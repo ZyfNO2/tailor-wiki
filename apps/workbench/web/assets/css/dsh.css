@@ -209,6 +209,18 @@ body.ef {
 }
 .dsh-return .ef-btn { max-width: 70vw; overflow: hidden; text-overflow: ellipsis; }
 
+/* 连接状态：失联、可能陈旧、地址换了工作区时的横幅；正常时隐藏 */
+.dsh-linkbar { flex: none; padding: 0.5rem 1rem 0; border-bottom: 1px solid var(--ef-rule); background: var(--ef-paper); }
+.dsh-linkbar .dsh-notice { margin-bottom: 0.5rem; }
+.dsh-link { display: inline-flex; }
+
+/* 研究进度四栏与目标对齐 */
+.dsh-progress .dsh-lane h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.dsh-progress .dsh-lane.is-blocked { border-top: 2px solid var(--ef-signal); }
+.dsh-progress .dsh-lane li .ef-field { font-size: 0.72rem; }
+.dsh-h3 { margin: 1.1rem 0 0.4rem; font-size: 0.95rem; }
+.dsh-route td.num { white-space: nowrap; }
+
 /* ---------- 2. 状态语法 ---------- */
 .st {
   display: inline-flex;

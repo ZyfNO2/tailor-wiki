@@ -54,6 +54,13 @@ test('ZIP is self-contained, exact manifest hashes match, installed runtime comp
   const workspace = path.join(root, 'workspace'); fs.mkdirSync(workspace);
   const install = JSON.parse(execFileSync(process.execPath, [path.join(extracted, 'install-independent.mjs'), '--workspace', workspace, '--write'], { encoding: 'utf8' }));
   assert.equal(install.destinations.length, 5);
+  // The optional read-only workbench ships in the package and installs by default.
+  assert.ok(archive['workbench/open.mjs'] && archive['workbench/server.mjs'] && archive['workbench/lib/pack.mjs']);
+  assert.equal(archive['workbench/web/assets/js/data.js'], undefined);
+  assert.equal(Object.keys(archive).some(name => name.startsWith('workbench/tests/') || name.startsWith('workbench/pack/')), false);
+  assert.equal(install.workbench.status, 'installed');
+  assert.ok(fs.existsSync(path.join(workspace, '.agents/workbench/open.mjs')));
+  assert.ok(fs.existsSync(path.join(workspace, '.agents/workbench/pack/trial-skills/wiki-maintain/scripts/wiki.mjs')));
   const intent = JSON.parse(execFileSync(process.execPath, [path.join(extracted, 'research-intent.mjs'), '--workspace', workspace, '--intent', 'research-init'], { encoding: 'utf8' }));
   assert.equal(intent.nativeSlashRegistered, false); assert.equal(intent.status, 'needs-input'); assert.equal(intent.questions.length, 2);
   assert.equal(fs.existsSync(path.join(workspace, '.agents/skills/research-story/references/sources.md')), true);
