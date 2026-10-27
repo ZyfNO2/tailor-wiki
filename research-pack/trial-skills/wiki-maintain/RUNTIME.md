@@ -36,7 +36,7 @@ node $wikiScript status --workspace "F:\my-project"
 {"paths":["materials","experiments/metrics.json"]}
 ```
 
-仅扫描指定路径。支持 UTF-8 Markdown、TXT、JSON、PDF。跳过 wiki 输出、.wiki、.git、.agents、.claude、旧 Core 目录、依赖、构建和常见凭证文件名。拒绝路径逃逸、符号链接和 junction；整个流程不执行来源中的命令。不存在的指定文件记暂时不可访问，局部扫描不推断其他文件被删除。
+仅扫描指定路径。支持 UTF-8 Markdown、TXT、JSON；PDF 需要页文本侧车（`extractions`）或已配置的解析器，二者都没有时登记为 unparsed（见下方 PDF 段）。跳过 wiki 输出、.wiki、.git、.agents、.claude、旧 Core 目录、依赖、构建和常见凭证文件名。拒绝路径逃逸、符号链接和 junction；整个流程不执行来源中的命令。不存在的指定文件记暂时不可访问，局部扫描不推断其他文件被删除。
 
 prepare 输出及 `.wiki/runs/<runId>/prepared.json` 包含：
 
@@ -97,7 +97,11 @@ feedback 读取实际字节、比较当前源版本，只产生 .wiki/runs 中se
 {"sourceSha256":"PDF原件的SHA256","pages":[{"page":1,"text":"第一页实际提取文本"},{"page":2,"text":"第二页实际提取文本"}]}
 ```
 
-页码必须连续从 1 开始，原件 hash 必须匹配，提取文件也被固定到 hash。工具验证映射结构，不能证明人工提供的页文与 PDF 视觉内容一致；parser 明确标注 `page-fidelity-unverified`。空文或解析异常失败并保留错误。没有 OCR 时不能声称图片页已理解。
+页码必须连续从 1 开始，原件 hash 必须匹配，提取文件也被固定到 hash。
+
+**大小限制分开计算。** 用侧车时 PDF 原件只做流式哈希、不载入解析，上限 1 GiB，所以超过 4 MiB 的论文原件可以直接用；侧车文件上限 8 MiB；拼接后的页文本与 Markdown/TXT/JSON 来源同为 4 MiB。进程内解析（`RESEARCH_PDFJS_MODULE`）需要载入原件，上限 64 MiB，超出时改用侧车。任何超限都明确报错，不截断，也不跳过原件哈希校验；apply 时再次流式核对原件，期间原件被改动会报 SOURCE_CHANGED。
+
+工具验证映射结构，不能证明人工提供的页文与 PDF 视觉内容一致；parser 明确标注 `page-fidelity-unverified`。空文或解析异常失败并保留错误。没有 OCR 时不能声称图片页已理解。
 
 ### draft.json（新版页面协议）
 
@@ -149,7 +153,18 @@ Agent 先识别候选身份、读取文档语境，再回原文选实质支持�
 
 `pageType` 为 summary/entity/concept/synthesis/comparison 之一；来源摘要与跨来源主题页要区分。`category` 最多两级，默认复用旧分类，显式改分类须尊重人工归类。标题、别名及 stable ID 不用当正文章节。旧 facts 局部 upsert/removal 仍兼容既有调用，但不作为新整理目标；已迁移页面禁止退回 facts 写入。旧渲染器仅用于旧页，不能把它叫作新版编译成文。
 
-顶层 `sourceContexts` 为增量更新数组，每项必须有 `sourceId, revision, title, documentType, date, summary, attribution`。revision 必须是该来源当前版本；日期/类型未知时明确写“未知”，不得凭文件名猜日期。例如设计稿 attribution 写“方案提出，非运行证据”；进度报告写“该报告记载，本轮未访问原指标”。这些字段帮助控制表述，不替代事实证据。来源版本变化后，旧语境不能为新版本的 reviewed 判定背书。
+顶层 `sourceContexts` 只列本轮要新增或更新语境的来源。**省略的来源保持原样；列出的每条按 sourceId 整体替换原记录，不做字段合并**，所以每项都要写全 `sourceId, revision, title, documentType, date, summary, attribution`。revision 必须是该来源当前版本；日期/类型未知时明确写“未知”，不得凭文件名猜日期。例如设计稿 attribution 写“方案提出，非运行证据”；进度报告写“该报告记载，本轮未访问原指标”。这些字段帮助控制表述，不替代事实证据。来源版本变化后，旧语境不能为新版本的 reviewed 判定背书。
+
+只提交本轮实际核读、确需更新的来源：改写一条语境（哪怕只改措辞）会让引用该来源的所有页面复核失效。原样重复提交不算改动；为尚无语境的来源新增语境不受限制。**改写本轮 prepare 范围之外已有来源的语境会被 `CONTEXT_SCOPE` 拒绝**，报错里列出这些来源和将失去复核的页面。用户明确授权全量维护时，在 draft 顶层加 `"contextUpdate":{"sourceIds":"all","reason":"用户授权的全量语境维护"}`（或列出具体 sourceId）；理由写入提交 provenance。
+
+只更新一个来源语境的局部示例（prepare 范围为 `reports/progress.md`）：
+
+```json
+{"runId":"run-…","baseCommitId":"commit-…","complete":true,"draftType":"agent","pages":[],
+ "sourceContexts":[{"sourceId":"source-…","revision":2,"title":"10 月进度报告","documentType":"进度报告","date":"2026-10","summary":"记录第二轮消融的设置与结果摘要。","attribution":"该报告记载，本轮未访问原指标"}]}
+```
+
+**提交前先预览变更范围。** 在同一 draft 顶层加 `"dryRun":true` 调用 apply：返回 `status:"preview"`、`wouldCommit`、`changedPageIds`、`contextChanges`（逐条来源与改动字段）和 `reviewInvalidatedPageIds`（本稿未改动、但因语境变化失去复核的页面），不写草稿、事件、日志或快照。确认后去掉 dryRun 再 apply；正式结果同样附带 `contextChanges` 与 `reviewInvalidatedPageIds`。
 
 顶层 `indexIntro:{"title":"领域标题","content":"材料覆盖范围与阅读导读"}` 单独保存。此处禁止页面链接，目录由实际 pages 的标题、摘要、类型和分类确定性生成，Agent 不生成目录条目。
 

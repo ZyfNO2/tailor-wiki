@@ -15,28 +15,47 @@ export const idPattern = id => new RegExp(`(?<![A-Za-z0-9_-])${id.replace(/[.*+?
 const lead = v => { const m = String(v ?? '').trim().match(/^[A-Za-z][\w.-]*/); return m ? m[0] : String(v ?? '').trim(); };
 
 /** Execution state from an explicit status cell; unrecognised stays unknown. */
+// Status words are read from explicit status cells only. Blocking and
+// negation are checked before positive words ("blocked (not run)" is blocked,
+// "incomplete" is not done); text that matches nothing stays unknown.
 export function execOf(value) {
   const t = String(value ?? '').trim().toLowerCase();
   if (blank(t)) return 'unknown';
-  if (/未完成|尚未完成|未开始|未运行|未执行|待运行|待执行|待开始|计划|pending|todo|not[-_\s]?run|planned|queued/.test(t)) return 'pending';
-  if (/运行中|进行中|执行中|running|in[-_\s]?progress/.test(t)) return 'running';
-  if (/阻塞|受阻|blocked/.test(t)) return 'blocked';
-  if (/失败|failed|error/.test(t)) return 'failed';
-  if (/取消|cancel/.test(t)) return 'cancelled';
-  if (/淘汰|放弃|abandon/.test(t)) return 'abandoned';
-  if (/完成|done|complete|finished|succe/.test(t)) return 'done';
-  if (/^待/.test(t)) return 'pending';
+  if (/阻塞|受阻|卡住|\bblocked\b|\bon[-_\s]?hold\b/.test(t)) return 'blocked';
+  if (/失败|报错|\bfail(?:ed|ure)?\b|\berror\b|\bcrash(?:ed)?\b/.test(t)) return 'failed';
+  if (/取消|中止|\bcancell?ed\b|\baborted\b/.test(t)) return 'cancelled';
+  if (/淘汰|放弃|\babandon(?:ed)?\b/.test(t)) return 'abandoned';
+  if (/部分完成|部分交付|\bpartial(?:ly)?\b/.test(t)) return 'unknown';
+  if (/运行中|进行中|执行中|\brunning\b|\bin[-_\s]?progress\b/.test(t)) return 'running';
+  if (/未完成|尚未|未开始|未运行|未执行|待运行|待执行|待开始|计划|\bincomplete\b|\bunfinished\b|\bnot[-_\s]+(?:yet[-_\s]+)?(?:run|started|done|complete[d]?|finished|executed)\b|\bpending\b|\btodo\b|\bto[-_\s]do\b|\bplanned\b|\bqueued\b|\bscheduled\b/.test(t)) return 'pending';
+  if (/已完成|完成|已交付|\bdone\b|\bcompleted?\b|\bfinished\b|\bsucceeded\b|\bsuccess(?:ful)?\b/.test(t)) return 'done';
+  if (/^待(?:运行|执行|开始|处理)/.test(t)) return 'pending';
   return 'unknown';
+}
+// Evidence provenance ("what kind of evidence") is kept apart from the
+// support verdict ("does it support the claim"): a run, a report or a
+// simulation never implies support, and support never implies a real run.
+const NEGATED = /(?:未|没有|尚未|并未|不是|并非|非)(?:本轮)?(?:实际)?(?:运行|执行|模拟|仿真|核验|复现|记载)/g;
+const PROVENANCE = [
+  ['historical', /报告记载|历史报告|文献报告|论文报告|论文记载|报告值|\breported\b|\bhistorical\b/gi],
+  ['verified', /已核验(?:的)?(?:原始)?(?:结果)?文件|核验原始结果|原始结果文件|\bverified (?:raw )?(?:result )?files?\b/gi],
+  ['current', /本轮(?:实际)?(?:运行|执行|实测)|实际运行|\bcurrent run\b|\bthis run\b/gi],
+  ['simulated', /模拟|仿真|\bsimulat\w*|\bsynthetic\b|\bmock(?:ed)?\b/gi],
+  ['hypothesis', /假设|设想|\bhypothes\w*|\bassum\w*/gi],
+];
+export function provenanceOf(value) {
+  const t = String(value ?? '').replace(NEGATED, ' ');
+  return PROVENANCE.map(([kind, re]) => { re.lastIndex = 0; const m = re.exec(t); return m ? [m.index, kind] : null; }).filter(Boolean).sort((a, b) => a[0] - b[0]).map(([, kind]) => kind);
 }
 /** Support state from an explicit evidence-status cell. */
 export function verdictOf(value) {
   const t = String(value ?? '').trim();
   if (blank(t)) return 'unknown';
-  if (/不支持|反驳|被否定/.test(t)) return 'refuted';
-  if (/不足|不充分/.test(t)) return 'insufficient';
-  if (/待核实|待核对/.test(t)) return 'verifying';
-  if (/待验证|待证|未验证|假设|计划|待定/.test(t)) return 'pending';
-  if (/有证据支持|有来源支持|已支持|已验证|证据充分|^支持/.test(t)) return 'supported';
+  if (/不支持|反驳|被否定|证伪|\brefuted\b|\bcontradict\w*/i.test(t)) return 'refuted';
+  if (/证据不足|不足|不充分|\binsufficient\b|\binconclusive\b/i.test(t)) return 'insufficient';
+  if (/待核实|待核对|\bto be verified\b|\bverifying\b/i.test(t)) return 'verifying';
+  if (/待验证|待证|未验证|尚未验证|假设|仅方案|方案主张|待定|\bpending\b|\buntested\b|\bnot (?:yet )?(?:verified|tested)\b/i.test(t)) return 'pending';
+  if (/有证据支持|有来源支持|已支持|证据充分|支持|\bsupported\b/i.test(t)) return 'supported';
   return 'unknown';
 }
 function earliest(value, table) {
@@ -55,7 +74,18 @@ const field = (text, names) => {
   return m ? plainInline(m[1]) : null;
 };
 export const readinessOf = v => (v ? earliest(v, [['可完整执行', 'full'], ['可试跑', 'pilot'], ['可设计', 'design']]) : null);
-export const decisionOf = v => (v ? (/已选定|用户已选|已选择|已选/.test(v) ? 'selected' : /授权/.test(v) ? 'delegated' : /建议|待选|待定|推荐|候选/.test(v) ? 'suggested' : null) : null);
+// Decisions only count when stated: negated phrases ("未授权", "尚未选定",
+// "not selected") are removed first and never read as a decision.
+export function decisionOf(value) {
+  if (!value) return null;
+  const t = String(value)
+    .replace(/(?:尚未|未曾|并未|未|没有|不)(?:经)?(?:用户)?(?:授权(?:代理)?(?:代选|选择)?|选定|选择|选|决定|批准|代选)/g, ' ')
+    .replace(/\bnot\s+(?:yet\s+)?(?:been\s+)?(?:selected|chosen|approved|authori[sz]ed|delegated)\b/gi, ' ');
+  if (/用户已选定|已选定|已选择|已选|\bselected\b|\bchosen\b/i.test(t)) return 'selected';
+  if (/授权代选|授权代理|授权.{0,6}(?:选择|代选|决定)|代理选择|\bdelegated\b/i.test(t)) return 'delegated';
+  if (/建议|待选|待定|推荐|候选|\bproposed\b|\bsuggested\b/i.test(t)) return 'suggested';
+  return null;
+}
 export const evidenceOf = v => (v ? (/有来源支持|有证据支持|已支持/.test(v) ? 'supported' : /部分/.test(v) ? 'partial' : /待核|待验证|未核/.test(v) ? 'pending' : /无证据|没有证据|^无$/.test(v) ? 'none' : null) : null);
 const tableOut = t => (t ? { headers: t.headers, rows: t.rows, line: t.line } : null);
 
@@ -178,7 +208,7 @@ export function parseStory(md, opt = {}) {
       const claim = cell(row, c.claim);
       if (!claim) return;
       const explicit = cell(row, c.id) || (claim.match(/^C\d+\b/) ?? [])[0];
-      contributions.push({ id: explicit ? lead(explicit) : `C${k + 1}`, aspect: null, text: claim.replace(/^C\d+\s*[:：.]?\s*/, ''), diff: cell(row, c.diff) || null, evidenceText: cell(row, c.src) || null, refs: [], state: verdictOf(cell(row, c.st)), statusText: cell(row, c.st) || null, gaps: [], gapText: cell(row, c.gap) || null, line: `第 ${t.lines[k]} 行`, rowText: row.join(' ') });
+      contributions.push({ id: explicit ? lead(explicit) : `C${k + 1}`, aspect: null, text: claim.replace(/^C\d+\s*[:：.]?\s*/, ''), diff: cell(row, c.diff) || null, evidenceText: cell(row, c.src) || null, refs: [], state: verdictOf(cell(row, c.st)), provenance: provenanceOf(`${cell(row, c.src)} ${cell(row, c.st)}`), statusText: cell(row, c.st) || null, gaps: [], gapText: cell(row, c.gap) || null, line: `第 ${t.lines[k]} 行`, rowText: row.join(' ') });
     });
   }
   const figT = findTable(doc.tables, [[/图|表/], [/问题|回答/]]);

@@ -36,7 +36,8 @@
       fail: ['未通过', 'g-ck-fail', 'alert'], na: ['未检查', 'g-ck-na', 'dash mute'] } },
     prov: { dim: '性质', items: {
       current: ['本轮执行', 'g-pv-current', 'solid'], historical: ['历史报告', 'g-pv-historical', 'dash'],
-      simulated: ['模拟', 'g-pv-simulated', 'hatch'], example: ['示例', 'g-pv-example', 'chip'], unknown: ['未标注性质', 'g-unknown', 'dash mute'] } },
+      simulated: ['模拟', 'g-pv-simulated', 'hatch'], example: ['示例', 'g-pv-example', 'chip'], unknown: ['未标注性质', 'g-unknown', 'dash mute'],
+      verified: ['已核验结果文件', 'g-ck-pass', 'solid'], hypothesis: ['假设', 'g-vd-pending', 'dash'] } },
     fresh: { dim: '读取', items: {
       ok: ['已读取', 'g-fr-ok', 'solid'], stale: ['可能陈旧', 'g-fr-stale', 'alert'],
       error: ['读取失败', 'g-fr-error', 'alert'], partial: ['部分读取', 'g-fr-partial', 'alert'],

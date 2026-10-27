@@ -41,17 +41,18 @@
           ${s.contributions.length ? html`
           <div class="ef-table-wrap">
             <table class="ef-table dsh-contrib">
-              <thead><tr><th>主张</th><th>相对已有工作的差异</th><th>来源 / Run / 产物（原文）</th><th>证据状态</th><th>局限或缺口</th></tr></thead>
+              <thead><tr><th>主张</th><th>相对已有工作的差异</th><th>来源 / Run / 产物（原文）</th><th>证据性质</th><th>支持状态</th><th>局限或缺口</th></tr></thead>
               <tbody>${s.contributions.map((c) => html`<tr id="contrib-${c.id}">
                 <td><span class="dsh-id">${c.id}</span> <span class="ef-read">${c.text}</span></td>
                 <td>${ui.val(c.diff)}</td>
                 <td>${ui.val(c.evidenceText, '没有写来源')}${c.refs.length ? html`<div>${ui.refs(c.refs, { idOnly: true })}</div>` : ''}</td>
+                <td>${(c.provenance || []).length ? html`<span class="dsh-chiprow">${c.provenance.map((k) => ui.st('prov', k))}</span>` : ui.st('prov', 'unknown')}</td>
                 <td>${stateChip(c.state)}${c.statusText ? html`<div class="ef-field">${c.statusText}</div>` : ''}</td>
                 <td>${ui.val(c.gapText, '无')}</td>
               </tr>`)}</tbody>
             </table>
           </div>
-          <p class="dsh-note">证据状态只取“证据状态”列的原文；关联对象只在 ID 实际出现时连上。</p>` : html`<p class="ef-empty">没有找到贡献—证据表（需要“主张”与“证据 / 来源”列）。</p>`}
+          <p class="dsh-note">证据性质（报告记载、已核验结果文件、本轮实际运行、模拟、假设）与支持状态分开显示，都只取单元格原文：运行过不等于支持，模拟不等于本轮真实实验。关联对象只在 ID 实际出现时连上。</p>` : html`<p class="ef-empty">没有找到贡献—证据表（需要“主张”与“证据 / 来源”列）。</p>`}
 
           ${s.figures.length ? html`
           <h2 class="dsh-h2">${ui.pair('Figures', '关键图表安排')}</h2>

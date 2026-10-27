@@ -61,6 +61,18 @@ export function sourceContexts(input, existing, sources) {
   return result;
 }
 
+// Which document contexts a draft adds or rewrites, field by field. Omitted
+// sources are untouched; a submitted record replaces the whole stored record.
+export function contextChanges(before = [], after = [], sources = []) {
+  const fields = ['revision', 'title', 'documentType', 'date', 'summary', 'attribution'], changes = [];
+  for (const context of after) {
+    const old = before.find(c => c.sourceId === context.sourceId), diff = fields.filter(k => !old || old[k] !== context[k]);
+    if (old && !diff.length) continue;
+    changes.push({ sourceId: context.sourceId, path: sources.find(s => s.sourceId === context.sourceId)?.path ?? null, change: old ? 'updated' : 'added', fields: diff });
+  }
+  return changes;
+}
+
 export function bindReview(page, supplied, contexts, old) {
   const citations = evidenceOf(page).flatMap(e => e.citations);
   const relevant = contexts.filter(c => citations.some(r => r.sourceId === c.sourceId && r.revision === c.revision));

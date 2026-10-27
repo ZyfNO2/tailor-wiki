@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { compilePage, evidenceOf, contentOf, sourceContexts, bindReview, updateIssues, semanticStatus } from './page-model.mjs';
+import { compilePage, evidenceOf, contentOf, sourceContexts, contextChanges, bindReview, updateIssues, semanticStatus } from './page-model.mjs';
 import { requestCoverage, reconcileCoverage } from './coverage.mjs';
 
 // Independent file workflow. No Core state, network client or model invocation.
@@ -38,7 +38,12 @@ function safe(root, relative, missing = false) {
   }
   return file;
 }
-function bounded(file, limit = 4 * 1024 * 1024) {
+// Text-like sources, extracted text and sidecars stay small; a PDF original is
+// only hashed (streamed) when a page-text sidecar supplies its text, so it may
+// be far larger. In-process parsing loads the PDF and keeps its own limit.
+const MiB = 1024 * 1024;
+export const LIMITS = Object.freeze({ text: 4 * MiB, sidecar: 8 * MiB, pdfParse: 64 * MiB, pdfHash: 1024 * MiB });
+function bounded(file, limit = LIMITS.text) {
   const stat = fs.lstatSync(file);
   if (!stat.isFile() || stat.isSymbolicLink()) fail('PATH_ESCAPE', file);
   if (stat.size > limit) fail('QUOTA', `${file} exceeds ${limit} bytes; not truncated`);
@@ -46,6 +51,19 @@ function bounded(file, limit = 4 * 1024 * 1024) {
   if (bytes.length !== stat.size) fail('SOURCE_CHANGED', file);
   return bytes;
 }
+function streamDigest(file, limit) {
+  const stat = fs.lstatSync(file);
+  if (!stat.isFile() || stat.isSymbolicLink()) fail('PATH_ESCAPE', file);
+  if (stat.size > limit) fail('QUOTA', `${file} exceeds ${limit} bytes; not hashed`);
+  const hash = createHash('sha256'), buffer = Buffer.allocUnsafe(MiB), fd = fs.openSync(file, 'r');
+  let total = 0;
+  try { for (let n; (n = fs.readSync(fd, buffer, 0, buffer.length, null)) > 0;) { hash.update(buffer.subarray(0, n)); total += n; } }
+  finally { fs.closeSync(fd); }
+  const after = fs.statSync(file);
+  if (total !== stat.size || after.size !== stat.size || after.mtimeMs !== stat.mtimeMs) fail('SOURCE_CHANGED', file);
+  return hash.digest('hex');
+}
+const isPdf = file => /\.pdf$/i.test(file);
 function atomic(file, content) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const temporary = `${file}.${randomUUID()}.tmp`;
@@ -120,6 +138,7 @@ export class FileWiki {
         if (command === 'rollback') return this.rollback(input, runId);
         fail('INVALID_COMMAND', command);
       } catch (error) {
+        if (command === 'apply' && input.dryRun === true) throw error;
         try { this.event(runId, 'failed', { command, error: String(error), pointer: this.pointer(), ...(command === 'feedback' ? { artifacts: input.artifacts } : command === 'prepare' ? { paths: input.paths, requestScope: input.requestScope } : {}) }); }
         catch (traceError) { throw new AggregateError([error, traceError], 'operation and trace persistence failed'); }
         throw error;
@@ -180,7 +199,7 @@ export class FileWiki {
       const source = current.sources.find(s => s.path === a.path), version = source?.versions.at(-1), receipt = (current.readReceipts ?? current.coverage?.entries)?.find(e => e.sourceId === source?.sourceId && ['read', 'reuse'].includes(e.status) && e.revision === version?.revision && e.sha256 === version?.sha256);
       const artifact = source?.artifact;
       if (!version || source.status !== 'available' || !artifact || artifact.artifactId !== a.artifactId || artifact.kind !== a.kind || json(artifact.relatedIds) !== json(a.relatedIds) || !receipt) return false;
-      return digest(bounded(safe(this.root, a.path))) === version.sha256 && (current.pages.some(p => evidenceOf(p).some(e => e.citations.some(c => c.sourceId === source.sourceId && c.revision === version.revision))) || (current.sourceDispositions ?? []).some(d => d.sourceId === source.sourceId && d.revision === version.revision));
+      return this.digestSource(a.path) === version.sha256 && (current.pages.some(p => evidenceOf(p).some(e => e.citations.some(c => c.sourceId === source.sourceId && c.revision === version.revision))) || (current.sourceDispositions ?? []).some(d => d.sourceId === source.sourceId && d.revision === version.revision));
     });
     if (allUnchanged) {
       for (const previous of pending.filter(p => p.artifacts?.every(a => input.artifacts.some(b => a.artifactId === b.artifactId)))) this.event(previous.runId, 'superseded', { byRunId: runId, reason: 'Current snapshot already maps these current artifact revisions.' });
@@ -220,25 +239,36 @@ export class FileWiki {
     }
     return { files: [...files].sort(), scopes, inventory: [...inventory.values()].sort((a, b) => a.path.localeCompare(b.path)) };
   }
+  // Hash of a workspace source as recorded in its version: PDFs are streamed.
+  digestSource(relative) {
+    const file = safe(this.root, relative);
+    return isPdf(relative) ? streamDigest(file, LIMITS.pdfHash) : digest(bounded(file));
+  }
   async source(file, extraction, cached) {
-    const bytes = bounded(safe(this.root, file)), sha256 = digest(bytes);
+    const full = safe(this.root, file), pdf = isPdf(file);
+    const bytes = pdf ? null : bounded(full), sha256 = pdf ? streamDigest(full, LIMITS.pdfHash) : digest(bytes);
     let text, pages = [], parser = 'utf8/1', extractionPin = null;
-    if (/\.pdf$/i.test(file)) {
+    if (pdf) {
       if (!extraction && cached?.sha256 === sha256 && cached.text !== null) {
         if (cached.extractionPin) extraction = { textPath: cached.extractionPin.path };
         else return { path: file, ...cached };
       }
       if (extraction) {
-        const textPath = nonempty(extraction.textPath, 'textPath'), sidecar = bounded(safe(this.root, textPath));
+        const textPath = nonempty(extraction.textPath, 'textPath'), sidecarFile = safe(this.root, textPath);
+        if (fs.lstatSync(sidecarFile).size > LIMITS.sidecar) fail('QUOTA', `${textPath}: page-text sidecar exceeds ${LIMITS.sidecar} bytes; split the source, not truncated`);
+        const sidecar = bounded(sidecarFile, LIMITS.sidecar);
         const data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(sidecar));
-        if (data.sourceSha256 !== sha256 || !Array.isArray(data.pages) || !data.pages.length) fail('INVALID_EXTRACTION', `${file}: sourceSha256 and nonempty pages required`);
+        if (data.sourceSha256 !== sha256 || !Array.isArray(data.pages) || !data.pages.length) fail('INVALID_EXTRACTION', `${file}: sourceSha256 must match the original PDF and pages must be nonempty`);
         pages = data.pages;
         parser = 'user-supplied-page-text/1;page-fidelity-unverified';
         extractionPin = { path: textPath, sha256: digest(sidecar) };
       } else {
         const modulePath = process.env.RESEARCH_PDFJS_MODULE;
         if (!modulePath || !path.isAbsolute(modulePath)) return { path: file, sha256, text: null, pages: [], parser: 'unavailable', issue: 'PDF_PARSER_UNAVAILABLE: provide configured pdfjs or page-mapped extraction' };
-        const pdfjs = await import(pathToFileURL(modulePath).href), task = pdfjs.getDocument({ data: Uint8Array.from(bytes), isEvalSupported: false, useSystemFonts: true });
+        if (fs.lstatSync(full).size > LIMITS.pdfParse) fail('QUOTA', `${file}: PDF exceeds the ${LIMITS.pdfParse}-byte in-process parse limit; provide a page-text sidecar via extractions (the original is then only hashed)`);
+        const data = bounded(full, LIMITS.pdfParse);
+        if (digest(data) !== sha256) fail('SOURCE_CHANGED', file);
+        const pdfjs = await import(pathToFileURL(modulePath).href), task = pdfjs.getDocument({ data: Uint8Array.from(data), isEvalSupported: false, useSystemFonts: true });
         try {
           const document = await task.promise;
           if (document.numPages > 300) fail('QUOTA', 'PDF exceeds 300 pages');
@@ -258,7 +288,7 @@ export class FileWiki {
       if (/\.json$/i.test(file)) JSON.parse(text);
     }
     nonempty(text, `no extracted text: ${file}`);
-    if (Buffer.byteLength(text) > 4 * 1024 * 1024) fail('QUOTA', 'text exceeds 4 MiB; not truncated');
+    if (Buffer.byteLength(text) > LIMITS.text) fail('QUOTA', `${file}: text exceeds 4 MiB; not truncated`);
     return { path: file, sha256, text, pages, parser, extractionPin, issue: null };
   }
   async prepare(input, runId) {
@@ -339,14 +369,21 @@ export class FileWiki {
     if (prepared.coverage?.requestedScan && json(this.scan(prepared.coverage.paths)) !== json(prepared.coverage.requestedScan)) fail('SOURCE_CHANGED', 'requested scope membership changed after prepare');
     for (const source of prepared.sources.filter(s => scan.files.includes(s.path))) {
       const version = source.versions.at(-1);
-      const bytes = bounded(safe(this.root, source.path));
-      if (digest(bytes) !== version.sha256) fail('SOURCE_CHANGED', source.path);
-      if (version.format !== '.pdf' && new TextDecoder('utf-8', { fatal: true }).decode(bytes) !== version.text) fail('SOURCE_CHANGED', 'prepared text differs from original');
-      if (version.extractionPin && digest(bounded(safe(this.root, version.extractionPin.path))) !== version.extractionPin.sha256) fail('SOURCE_CHANGED', 'page extraction changed');
+      if (isPdf(source.path)) {
+        if (this.digestSource(source.path) !== version.sha256) fail('SOURCE_CHANGED', source.path);
+      } else {
+        const bytes = bounded(safe(this.root, source.path));
+        if (digest(bytes) !== version.sha256) fail('SOURCE_CHANGED', source.path);
+        if (new TextDecoder('utf-8', { fatal: true }).decode(bytes) !== version.text) fail('SOURCE_CHANGED', 'prepared text differs from original');
+      }
+      if (version.extractionPin && digest(bounded(safe(this.root, version.extractionPin.path), LIMITS.sidecar)) !== version.extractionPin.sha256) fail('SOURCE_CHANGED', 'page extraction changed');
     }
   }
   apply(input, runId) {
-    fresh(this.location(`.wiki/runs/${runId}/draft-${randomUUID()}.json`), json(input));
+    // dryRun validates the draft and reports its change scope without writing
+    // a draft record, event, journal or snapshot.
+    const dryRun = input.dryRun === true;
+    if (!dryRun) fresh(this.location(`.wiki/runs/${runId}/draft-${randomUUID()}.json`), json(input));
     if (input.complete !== true || !['agent', 'fixture'].includes(input.draftType) || !Array.isArray(input.pages)) fail('INCOMPLETE_DRAFT', 'complete:true, draftType:agent|fixture and pages required');
     const prepared = readJSON(this.location(`.wiki/runs/${runId}/prepared.json`)), current = this.current();
     if (current.commitId !== input.baseCommitId || prepared.baseCommitId !== current.commitId) fail('REVISION_CONFLICT', 'base commit changed; prepare again');
@@ -415,16 +452,45 @@ export class FileWiki {
       if (old) next.pages[next.pages.indexOf(old)] = page; else next.pages.push(page);
     }
     for (const page of next.pages) if (page.content !== undefined && !seen.has(page.pageId)) page.review = bindReview(page, undefined, next.sourceContexts, page);
+    const changes = contextChanges(current.sourceContexts, next.sourceContexts, next.sources);
+    // Reviews lost as a side effect: pages this draft did not touch whose
+    // recorded review no longer matches their document contexts.
+    const reviewInvalidatedPageIds = next.pages.filter(page => !seen.has(page.pageId) && page.review?.status === 'not-reviewed' && ['reviewed', 'needs-review'].includes(current.pages.find(p => p.pageId === page.pageId)?.review?.status)).map(p => p.pageId);
+    this.checkContextScope(input, prepared, changes, next);
     next.issues = updateIssues(input.issues ?? [], current.issues, next.pages, next.sources);
     for (const pageId of prepared.affectedPageIds) if (!seen.has(pageId) && !(input.deferredPages ?? []).some(d => d.pageId === pageId && typeof d.reason === 'string' && d.reason.trim())) fail('UNRESOLVED_PAGE', `update or explicitly defer ${pageId}`);
     this.validateLinks(next.pages);
     const comparable = state => ({ sources: state.sources, pages: state.pages, sourceDispositions: state.sourceDispositions ?? [], sourceContexts: state.sourceContexts ?? [], indexIntro: state.indexIntro ?? null, issues: state.issues ?? [], coverage: state.coverage?.mode === 'legacy-unattested' ? null : state.coverage ?? null, coverageRequests: state.coverageRequests ?? [], readReceipts: state.readReceipts ?? [] });
-    if (digest(comparable(next)) === digest(comparable(current))) {
+    const unchanged = digest(comparable(next)) === digest(comparable(current)), scope = { contextChanges: changes, reviewInvalidatedPageIds };
+    if (dryRun) {
+      const changedPageIds = next.pages.filter(p => current.pages.find(o => o.pageId === p.pageId)?.contentHash !== p.contentHash).map(p => p.pageId);
+      return { status: 'preview', wouldCommit: !unchanged, baseCommitId: current.commitId, changedPageIds, ...scope, ...this.completion(next), note: 'Preview only: nothing was written. Apply the same draft without dryRun to commit.' };
+    }
+    if (unchanged) {
       const syncStatus = this.feedbackResult(prepared, current);
       this.event(runId, 'unchanged', { commitId: current.commitId, draftType: input.draftType, feedbackStatus: syncStatus });
-      return { status: 'unchanged', commitId: current.commitId, ...(syncStatus ? { syncStatus } : {}), ...this.completion(current) };
+      return { status: 'unchanged', commitId: current.commitId, ...(syncStatus ? { syncStatus } : {}), ...this.completion(current), ...scope };
     }
-    return this.commit(next, current, runId, { command: 'apply', draftType: input.draftType, preparedRunId: runId, removals: input.pages.map(p => ({ pageId: p.pageId, changeReason: p.changeReason, removeFacts: p.removeFacts ?? [], changes: (p.facts ?? []).filter(f => f.changeReason).map(f => ({ id: f.id, reason: f.changeReason })) })) });
+    const provenance = { command: 'apply', draftType: input.draftType, preparedRunId: runId, removals: input.pages.map(p => ({ pageId: p.pageId, changeReason: p.changeReason, removeFacts: p.removeFacts ?? [], changes: (p.facts ?? []).filter(f => f.changeReason).map(f => ({ id: f.id, reason: f.changeReason })) })), ...(input.contextUpdate ? { contextUpdate: input.contextUpdate } : {}) };
+    return { ...this.commit(next, current, runId, provenance), ...scope };
+  }
+  // Rewriting an existing document context changes the review binding of
+  // every page citing that source. Within this run's prepared scope that is
+  // expected; outside it, it must be declared (e.g. a user-authorised full pass).
+  checkContextScope(input, prepared, changes, next) {
+    const scoped = new Set(prepared.sources.filter(s => prepared.scan.files.includes(s.path)).map(s => s.sourceId));
+    const outside = changes.filter(c => c.change === 'updated' && !scoped.has(c.sourceId));
+    const declared = input.contextUpdate;
+    if (declared !== undefined) {
+      if (!declared || (declared.sourceIds !== 'all' && !Array.isArray(declared.sourceIds))) fail('INVALID_INPUT', 'contextUpdate.sourceIds must be "all" or an array of sourceIds');
+      nonempty(declared.reason, 'contextUpdate.reason (why contexts outside this run are rewritten)');
+      if (Array.isArray(declared.sourceIds) && declared.sourceIds.some(id => !next.sources.some(s => s.sourceId === id))) fail('INVALID_INPUT', 'contextUpdate.sourceIds names an unknown source');
+    }
+    const allowed = id => declared?.sourceIds === 'all' || (Array.isArray(declared?.sourceIds) && declared.sourceIds.includes(id));
+    const refused = outside.filter(c => !allowed(c.sourceId));
+    if (!refused.length) return;
+    const pages = next.pages.filter(p => evidenceOf(p).some(e => e.citations.some(c => refused.some(r => r.sourceId === c.sourceId)))).map(p => p.pageId);
+    fail('CONTEXT_SCOPE', `sourceContexts would rewrite ${refused.length} source(s) outside this run's prepared scope: ${refused.map(c => `${c.path ?? c.sourceId} (${c.fields.join(', ')})`).join('; ')}; pages citing them lose their review binding: ${pages.join(', ') || 'none'}. Submit only sources read in this run, or declare contextUpdate {sourceIds:[...]|"all", reason} when the user authorised it. Preview first with dryRun:true.`);
   }
   render(page, sources, contexts = []) {
     if (page.content !== undefined) {
