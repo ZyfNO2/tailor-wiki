@@ -8,7 +8,7 @@
 [安装与使用](#-quick-start) · [五个技能](#-从哪个入口开始) · [工作台展示](#-showcase--研究工作台) · [验证记录](docs/VERIFICATION.md)
 
 > 📷 **工作台总览展示占位**
-> 待新版 UI 合并并验收后，补充真实截图与演示。以下展示位置用于说明产品结构，不代表全部功能已经实现。
+> 真实截图待真实工作区回归后补充。以下展示位置用于说明产品结构；各部分的实际状态见 [Status & Roadmap](#-status--roadmap)。
 
 ## 🎯 What is Tailor Wiki?
 
@@ -84,7 +84,7 @@
 
 目标体验：**任一流程有产物，就能打开工作台查看，不必等全流程完成。** 尚无产物的分区显示空状态，已失败或待同步的事项如实显示。
 
-已合入研究工作台，支持已有 Wiki、方案、DAG、实验和故事展示，也支持没有 Wiki 的单阶段产物。各 Skill 默认收尾提供入口仍未接通；下方截图继续占位，浏览器交互验收尚待完成。
+研究工作台展示已有的 Wiki、方案、DAG、实验、叙事和导学，也支持没有 Wiki 的单阶段产物。任一 Skill 有产物时，收尾用 `open.mjs` 交付核对过工作区绑定的地址；启动失败给出真实错误与 Markdown 文件路径。已用合成工作区和 DSH 试跑副本做浏览器验收；下方截图仍占位。
 
 ### 01 · 项目总览
 
@@ -104,7 +104,7 @@
 查看材料、概念、方法、假设与实验之间的关系，从当前页面展开关联与冲突。共同出现不自动等于相互支持，知识关系不等于执行依赖。
 
 > 📷 **展示占位：局部知识图谱与节点证据详情**
-> 待实现/接入新版 UI。
+> 工作台已有只读图谱，截图待补。
 
 ### 04 · 学术裁缝与创新假设
 
@@ -117,7 +117,7 @@
 展示任务之间真实的输入输出依赖、负责人和阻塞条件。方法结构图与任务 DAG 分开；移动画布节点不应改变真实执行状态。
 
 > 📷 **展示占位：研究 DAG、任务详情与上下游依赖**
-> 文件级任务规划已纳入 Skill，完整白板待接入。
+> 工作台已有只读 DAG 白板；academic-tailor 交付前可运行 DAG 自检（重复 ID、缺失端点、自依赖、环、主张误作依赖）。
 
 ### 06 · 实验计划与结果
 
@@ -127,11 +127,17 @@
 
 ### 07 · 研究故事
 
-开篇先回答“为什么做—问题是什么—怎么解决—证据支持什么”，再按需展开贡献—证据表、图表安排与补证事项。
+开篇先回答“为什么做—问题是什么—怎么解决—证据支持什么”，再按需展开贡献—证据表、图表安排与补证事项。证据性质（报告记载、本轮运行、模拟等）与支持状态分开显示；文件里已有组会提纲或开题摘要时一并列出。
 
 > 📷 **展示占位：简版研究故事与证据附录**
 
-### 08 · 任务状态与 Team · Planned
+### 08 · 研究导学
+
+显示学习目标、阅读范围、阅读路线（要弄懂的问题、概念、论文/代码位置、读完能解释什么、最小练习）和当前待答题。讲解与练习仍在 Agent 对话里；个人回答只在明确提供时显示，不作为科研证据。
+
+> 📷 **展示占位：导学路线与待答题**
+
+### 09 · 任务状态与 Team · Planned
 
 Team 是后续可选执行扩展，当前独立包不提供完整 Team 调度系统。预留成员职责、任务状态、依赖和产物查看位置；没有 Team 也可以由用户或单 Agent 推进实验。
 
@@ -160,12 +166,13 @@ flowchart LR
 | `research-pack/trial-skills/` | 五个独立 Skill、引用资料与运行助手 |
 | `research-pack/install-independent.mjs` | 工作区安装器 |
 | `apps/wiki-reader/` | 原 WeKnora 组件剪枝与文件快照适配 |
+| `apps/workbench/` | 只读研究工作台与收尾入口 `open.mjs` |
 | `tests/file-wiki/` | 文件、分发、覆盖与回流机制测试 |
 | `docs/` | 验证记录、试跑审阅与后续需求 |
 
 ## 🚀 Quick Start
 
-当前更新请从仓库源码安装，在仓库根目录执行以下命令。独立 ZIP 待修复验收后重新发布，旧包不代表当前源码。需要 Node.js 24+，目标研究工作区应已存在：
+从仓库源码安装，在仓库根目录执行以下命令；也可使用仓库内由当前源码构建的 `releases/independent-skills.zip`，解压后在包目录运行 `node install-independent.mjs`，参数相同。需要 Node.js 24+，目标研究工作区应已存在：
 
 ```powershell
 # 预览安装内容
@@ -175,7 +182,7 @@ node research-pack/install-independent.mjs --workspace "F:\my-research"
 node research-pack/install-independent.mjs --workspace "F:\my-research" --write
 ```
 
-安装到 `.agents/skills/`，不写凭据、不覆盖已有同名目录。宿主需支持文件读取及 Skill 发现；也可明确要求 Agent 读取对应 `SKILL.md`。更新安装前保留本地修改。
+安装到 `.agents/skills/`，不写凭据、不覆盖已有同名目录。只读工作台默认一并装到 `.agents/workbench/`（已存在则保持不动），不需要时加 `--no-workbench`，Skill 内容完全相同。宿主需支持文件读取及 Skill 发现；也可明确要求 Agent 读取对应 `SKILL.md`。更新安装前保留本地修改。
 
 Claude Code 读取项目 `.claude/skills/`，加 `--host claude`：
 
@@ -208,13 +215,20 @@ node apps/wiki-reader/server.mjs --workspace "F:\my-research" --port 8771
 
 ## 只读研究工作台
 
-`apps/workbench` 把工作区里已有的文件做成只读展示：Wiki 已发布快照（经运行助手校验）、TAILOR.md、RESEARCH-DAG.md、EXPERIMENT-PLAN.md、STORY-PLAN.md，以及用 `--paths` 指定的运行记录。
+`apps/workbench` 把工作区里已有的文件做成只读展示：Wiki 已发布快照（经运行助手校验）、TAILOR.md、RESEARCH-DAG.md、EXPERIMENT-PLAN.md、STORY-PLAN.md、RESEARCH-GUIDE.md，以及用 `--paths` 指定的运行记录、结果报告（其中的复盘与进度回顾）和练习记录。
 
 ```powershell
+# 打开：复用已绑定本工作区的服务，否则在后台启动；只输出核对过的地址
+npm run workbench:open -- --workspace "F:\my-research" --paths runs
+
+# 已安装到工作区时，在工作区根目录
+node .agents/workbench/open.mjs --workspace . --paths runs
+
+# 前台运行（调试）
 npm run workbench -- --workspace "F:\my-research" --paths runs
 ```
 
-浏览器打开 http://127.0.0.1:8772。服务只接受 GET，只返回工作台自己的页面文件，不提供工作区文件；它不拿写锁、不写任何文件，所以各 Skill 运行时它照常可开，关掉它也不影响 Skill。页面每约 5 秒检查已跟踪文件的变化；引用原件及部分维护状态的刷新覆盖仍待完善。表格只取各 Skill 规定的列，状态只认文件中写明的字段，识别不了的按原文显示，不推断。直接双击 `apps/workbench/web/index.html` 显示示例数据（设计原型）。测试：`npm run test:workbench`。
+`open.mjs` 先用 `/api/identity` 核对端口上的服务是否读同一工作区与同一组 `--paths`，不是就换端口，不会返回别的项目；启动失败时打印真实错误和工作区里的 Markdown 产物路径。服务只接受 GET，只返回工作台自己的页面文件，不提供工作区文件；它不拿写锁、不写任何文件，所以各 Skill 运行时它照常可开，关掉它也不影响 Skill。页面在前台时约每 5 秒检查一次文件指纹（研究文档、Wiki 快照与运行事件、登记来源原件、`--paths` 内文件），有变化就重读；顶栏显示最后检查时间，服务失联、长时间没检查成功或同一地址换成另一个工作区时显示横幅。后台标签页暂停检查。表格只取各 Skill 规定的列，状态只认文件中写明的字段，识别不了的按原文显示，不推断。直接双击仓库里的 `apps/workbench/web/index.html` 显示示例数据（设计原型；安装到工作区的副本不带示例数据）。测试：`npm run test:workbench`。职责边界见 [产品需求](docs/PRODUCT-REQUIREMENTS.md)。
 ## 📍 Status & Roadmap
 
 | 项目 | 当前状态 |
@@ -223,8 +237,8 @@ npm run workbench -- --workspace "F:\my-research" --paths runs
 | Wiki 覆盖对账、引用、快照、恢复与增量回流机制 | 已有实现与工程验证 |
 | 先给简版故事、证据详情后置 | 已实现，待真实任务试跑 |
 | 原 WeKnora 只读 Wiki reader | 已有实现，展示范围以 reader 说明为准 |
-| 任一流程收尾默认提供工作台入口 | 尚未接通，当前需手动启动 |
-| 全工作台、图谱、DAG 白板 | 已合入，接口测试通过；浏览器交互待验收 |
+| 任一流程收尾默认提供工作台入口 | 已接通：`open.mjs` 核对工作区绑定后交付地址；活宿主自动收尾与 Ch3 真实回归未做 |
+| 全工作台、图谱、DAG 白板、导学、复盘、进度 | 已合入；合成工作区与 DSH 试跑副本浏览器验收；Ch3 真实回归未做 |
 | Team | 后续占位 |
 | DSH 插件同步 | 后于技能包更新，独立验证发布 |
 

@@ -1,6 +1,6 @@
 # Skill 与工作台完善交接
 
-更新日期：2026-10-27。接手入口：先读本文，再读 [产品需求](PRODUCT-REQUIREMENTS.md)、[工作台合并审阅](WORKBENCH-MERGE-REVIEW.md)。本次提交交付此前的 Skill 增量、工作台兼容修复和本交接，**下列待办尚未实施**。
+更新日期：2026-10-27。接手入口：先读本文，再读 [产品需求](PRODUCT-REQUIREMENTS.md)、[工作台合并审阅](WORKBENCH-MERGE-REVIEW.md)。下列三批待办已在分支 `claude/handoff-fixes` 实施，逐项结果、代码位置与未验证项见文末[实施结果](#实施结果2026-10-27)。**Ch3 真实回归未做**：本机找不到该工作区。
 
 ## 当前基线与边界
 
@@ -70,3 +70,34 @@
 ## 研究内容单独处理
 
 用户报告细化迭代、3090 时延、参数量、主干结构名称存在草稿/论文/实验差异；CVA-Net 与本地 CVCL 应区分。保留为待核对问题，不把跨分辨率时延或不同表参数直接判定等价，也不在插件修复中替用户改论文结论。
+
+## 实施结果（2026-10-27）
+
+分支 `claude/handoff-fixes`，基于 b326da5；三批各一个提交（99cc47c、dd10fa0、46d3905），文档与正式包另行提交。仓库里没有 AGENTS.md，按本文与需求文档执行。
+
+| 编号 | 结果 | 代码位置 | 验证 |
+| --- | --- | --- | --- |
+| B1 | PDF 原件流式计算哈希（上限 1 GiB），侧车单独限 8 MiB、文本 4 MiB、pdf.js 解析 64 MiB；sourceSha256 不符或页为空即失败，不截断、不绕过校验 | wiki-maintain/scripts/wiki.mjs（LIMITS、streamDigest、digestSource、source） | tests/file-wiki/pdf-sidecar.spec.mjs |
+| B3 | sourceContexts 省略的来源保持原样，列出的整条替换；改写本轮 prepare 范围外的语境会被 CONTEXT_SCOPE 拒绝，需在 contextUpdate 写明来源（或 all）与理由；dryRun 预览变更及会失效的复核页 | wiki.mjs（apply、checkContextScope）、page-model.mjs（contextChanges）、RUNTIME.md、SKILL.md | tests/file-wiki/source-contexts.spec.mjs |
+| W1 | 证据性质（报告记载、已核验结果文件、本轮运行、模拟、假设）与支持状态分列，均保留原文 | apps/workbench/lib/documents.mjs（provenanceOf、verdictOf）、views/story.js | documents.spec.mjs |
+| S1 | 否定与阻塞优先：incomplete、blocked (not run)、未授权 等不再误判，识别不了保持未知 | documents.mjs（execOf、decisionOf） | documents.spec.mjs 中英文回归 |
+| W2 | 补证事项、禁用表述从表格或列表读取并去重；无法识别显示原文，不计为 0 | documents.mjs（sectionItems、parseStory） | documents.spec.mjs |
+| W3 | 按结构识别运行集合，保留文件与 JSON 指针；性质只取记录或文件写明的 | research-pack/research-intent.mjs（runCollection 等）、adapter.mjs（runsOf） | intake.spec.mjs；Ch3 的 17 条未实测 |
+| W4 | 扫描项、登记来源、排除项、不可用项分开计数，概览、覆盖、来源列表一致并可筛选 | apps/workbench/lib/wiki.mjs（counts）、derive.js、knowledge.js、overview.js | intake.spec.mjs；54/41/13 未实测 |
+| D1 | academic-tailor 交付前自检：重复 ID、端点、自依赖、环、主张作依赖、占位行、计划依赖执行自身的任务，给出文件:行；工作台把主张关联与占位行分开列出 | academic-tailor/scripts/check-dag.mjs、SKILL.md、views/dagview.js | tests/file-wiki/check-dag.spec.mjs；ds-flow-test 只读复现 |
+| 研究叙事 | 开篇四段（为什么做 → 遇到什么问题 → 怎样解决 → 数据支持什么），贡献—证据表、补证事项、禁用表述；文件已有组会提纲或开题摘要时才列出 | documents.mjs（storyOpening、storyFormats）、views/story.js | documents.spec、delivery.spec、浏览器 |
+| 研究导学 | 新页面：学习目标、阅读范围、路线表、待答题；RESEARCH-PRACTICE.md 只在 --paths 明确提供时显示 | documents.mjs（parseGuide）、views/guide.js | delivery.spec、浏览器 |
+| 实验复盘 | 复盘标签，五项分列；受阻、未执行、本轮、历史、模拟分开计数 | documents.mjs（parseRetro）、views/experiments.js | delivery.spec、浏览器 |
+| 概览／任务 | 已交付、受阻、待验证、下一步（有进度回顾时“下一步”取其原文）；Wiki 回流按内容哈希比对 | adapter.mjs（progress、wikiFeedback）、ui.js（ui.progress）、overview.js、tasks.js | delivery.spec、浏览器 |
+| 研究方案 | 目标对齐表：表达、证据、实验、方法缺口与关联材料 | documents.mjs（alignment）、views/schemes.js | delivery.spec、浏览器 |
+| 默认收尾 | open.mjs 用 /api/identity 核对工作区与 --paths 后才复用；被其他程序或项目占用的端口跳过；后台启动并核对后才输出地址；失败给真实错误与 Markdown 路径。安装器默认装到 `<宿主目录>/workbench`，`--no-workbench` 跳过；五个 SKILL.md 增加“交付展示” | apps/workbench/open.mjs、server.mjs、lib/pack.mjs、research-pack/install-independent.mjs、scripts/build-independent-skills.mjs | launch.spec.mjs、distribution.spec、浏览器 |
+| 刷新与断连 | 顶栏显示最后检查时间；服务失联、长时间未检查成功、同一地址换了工作区均有横幅；指纹覆盖导学、运行事件和登记来源原件 | live.js、adapter.mjs（fingerprint）、wiki.mjs（drift） | delivery.spec、浏览器断连与恢复 |
+
+工程测试与浏览器验收的具体结果见 [工程验证记录](VERIFICATION.md)。
+
+### 未验证项与复现方式
+
+- **Ch3 真实回归未做**：本机没有 `_workspace/ch3-wiki-trial-20261027`。W3 的 17 条记录、W4 的 54/41/13 计数、B1 的真实大 PDF 侧车只有 fixture 验证。复现：在 Ch3 工作区副本运行 `npm run workbench:open -- --workspace <副本> --paths <运行记录目录>`，核对来源计数与运行条目；对原始大 PDF 及其侧车运行 wiki-maintain 的 prepare/apply，确认哈希校验与侧车限额。
+- 已用 ds-flow-test 的副本做只读回归与浏览器检查；它是 DSH 试跑产物，不含 Ch3 的实验记录。
+- 活宿主（Claude Code、DSH）里由 Skill 自动执行“交付展示”未实测；launcher 本身已用测试和真实启动验证。
+- 研究内容差异（细化迭代、3090 时延、参数量、主干名称、CVA-Net 与 CVCL）仍按上节单独处理，未改论文或结论。

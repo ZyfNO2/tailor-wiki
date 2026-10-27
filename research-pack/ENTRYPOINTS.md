@@ -33,13 +33,13 @@ node research-intent.mjs --workspace "F:\my-project" --input intent.json
 
 ## Claude Code
 
-Claude Code 从项目 `.claude/skills/<name>/SKILL.md` 发现 Skill。安装时加 `--host claude`，只写这一目录，不改 `.claude/settings*.json`、MCP 或全局配置：
+Claude Code 从项目 `.claude/skills/<name>/SKILL.md` 发现 Skill。安装时加 `--host claude`，只写这一目录和默认附带的只读工作台 `.claude/workbench/`（`--no-workbench` 跳过），不改 `.claude/settings*.json`、MCP 或全局配置：
 
 ```powershell
 node install-independent.mjs --workspace "F:\my-project" --host claude --write
 ```
 
-按 Claude Code 约定，四个 Skill 以原名调用（`/wiki-maintain`、`/academic-tailor`、`/experiment-design`、`/research-story`），或直接描述任务由 Claude 按 description 选用。Claude Code 内置 `/init` 用于生成 CLAUDE.md，本分发不占用；整理/恢复 Wiki 用 `wiki-maintain` 或本地 `--intent research-init`。
+按 Claude Code 约定，五个 Skill 以原名调用（`/wiki-maintain`、`/academic-tailor`、`/experiment-design`、`/research-story`、`/research-guide`），或直接描述任务由 Claude 按 description 选用。Claude Code 内置 `/init` 用于生成 CLAUDE.md，本分发不占用；整理/恢复 Wiki 用 `wiki-maintain` 或本地 `--intent research-init`。
 
 `research-intent.mjs` 同时识别 `.agents/skills` 与 `.claude/skills`。Wiki 扫描和产物读取跳过 `.claude/`，不把 Skill 说明或本地设置当作研究材料。仓库测试验证安装布局、frontmatter 约束与安装后的运行助手，未在活 Claude Code 会话验证菜单显示。
 

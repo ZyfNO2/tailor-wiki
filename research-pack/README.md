@@ -116,7 +116,7 @@ flowchart LR
 | `install-independent.mjs` | 将五个独立 Skill 安装到指定工作区 |
 | `research-intent.mjs`、[ENTRYPOINTS.md](ENTRYPOINTS.md) | 五个短意图的本地只读交接；保留宿主内置 `/init`，不冒充原生菜单注册 |
 
-工作台作为展示层推进；静态参考原型不等于已完成的 WeKnora 源码剪枝。完整图谱、DAG 白板与 Team 界面仍需设计和接线，见 [UI 设计需求](../planning/2026-10-25/ui-design-handoff/UI-DESIGN-BRIEF.md)。源码仓库中的只读工作台（apps/workbench）读取 Wiki 快照与四个 Skill 的产物文件做展示，不随本技能包分发；本包的安装与使用不依赖它。
+工作台作为展示层推进；静态参考原型不等于已完成的 WeKnora 源码剪枝。完整图谱、DAG 白板与 Team 界面仍需设计和接线，见 [UI 设计需求](../planning/2026-10-25/ui-design-handoff/UI-DESIGN-BRIEF.md)。只读工作台（源码在 apps/workbench）随包放在 `workbench/`，安装时默认复制到工作区 `<宿主目录>/workbench/`，加 `--no-workbench` 跳过；Skill 不导入它，没有它也照常使用。它读取 Wiki 快照与五个 Skill 的产物文件做展示，不执行、不审批、不调度。
 
 ## 🚀 Quick Start
 
@@ -130,7 +130,9 @@ node install-independent.mjs --workspace "F:\my-research"
 node install-independent.mjs --workspace "F:\my-research" --write
 ```
 
-安装位置为工作区下的 `.agents/skills/`。安装器不改全局配置、不写模型凭据，遇到同名目录会拒绝覆盖；更新已有安装前保留本地修改，按宿主支持的更新方式处理。目录发现与斜杠命令支持以实际宿主为准。
+安装位置为工作区下的 `.agents/skills/`，只读工作台默认装到 `.agents/workbench/`（已存在则保持不动）。安装器不改全局配置、不写模型凭据，遇到同名目录会拒绝覆盖；更新已有安装前保留本地修改，按宿主支持的更新方式处理。目录发现与斜杠命令支持以实际宿主为准。
+
+有产物时在工作区根目录运行 `node .agents/workbench/open.mjs --workspace .`（运行记录目录加 `--paths`）。它只复用核对过绑定本工作区的服务，否则换端口在后台启动，输出核对过的地址；启动失败时给出真实错误与 Markdown 文件路径。
 
 Claude Code 用户加 `--host claude`，安装到项目 `.claude/skills/`，见 [入口说明](ENTRYPOINTS.md#claude-code)。
 
@@ -150,7 +152,7 @@ Claude Code 用户加 `--host claude`，安装到项目 `.claude/skills/`，见 
 | 全范围覆盖对账的程序强制检查 | requestScope、版本绑定阅读证明、跨请求未读待办已实现；字节对账不是语义证明 |
 | 短意图入口、读取适配 | 本地 research-intent 可用，真实 DSH filesystem provider 发现四 Skill 已验；原生 slash 未注册 |
 | 只读 Wiki reader | 原 WK Vue/TDesign reader/version 裁剪接线，验证记录随工程交付；不是完整工作台 |
-| 知识图谱与 DAG 白板 | 源码仓库只读工作台已接入 Wiki 快照、RESEARCH-DAG.md 等实际文件；不随本包分发，不影响 Skill |
+| 只读工作台（图谱、DAG 白板、导学、复盘、进度） | 读取实际文件；随包默认安装，可 `--no-workbench` 跳过；不影响 Skill；Ch3 真实回归未做 |
 | Claude Code 安装 | `--host claude` 安装到项目 `.claude/skills/`；扫描排除 `.claude/`；未在活会话验证菜单 |
 | Team | 占位，后续可选扩展 |
 | DSH 插件同步 | 后于技能包更新，独立验收与发布 |
