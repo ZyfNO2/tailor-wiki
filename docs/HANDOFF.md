@@ -93,7 +93,7 @@
 | 默认收尾 | open.mjs 用 /api/identity 核对工作区与 --paths 后才复用；被其他程序或项目占用的端口跳过；后台启动并核对后才输出地址；失败给真实错误与 Markdown 路径。安装器默认装到 `<宿主目录>/workbench`，`--no-workbench` 跳过；五个 SKILL.md 增加“交付展示” | apps/workbench/open.mjs、server.mjs、lib/pack.mjs、research-pack/install-independent.mjs、scripts/build-independent-skills.mjs | launch.spec.mjs、distribution.spec、浏览器 |
 | 刷新与断连 | 顶栏显示最后检查时间；服务失联、长时间未检查成功、同一地址换了工作区均有横幅；指纹覆盖导学、运行事件和登记来源原件 | live.js、adapter.mjs（fingerprint）、wiki.mjs（drift） | delivery.spec、浏览器断连与恢复 |
 
-工程测试与浏览器验收的具体结果见 [工程验证记录](VERIFICATION.md)。
+工程测试与浏览器验收的具体结果见 [工程验证记录](VERIFICATION.md)。验收中发现窄屏表格挤压、复盘把未运行的本轮记录计入执行两处问题，已在 5ea2ef2 修复。open.mjs 会在后台留下服务，6d30ad6 让服务拒绝非回环 Host（防 DNS 重绑定）。正式包 `releases/independent-skills.zip` 由 6d30ad6 重新构建，旧的带编号 ZIP 已删除，清单与哈希见 releases/CONTENTS.json。
 
 ### 未验证项与复现方式
 
